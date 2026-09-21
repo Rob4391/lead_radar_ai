@@ -1,4 +1,4 @@
-name: CI - Prisma + Tests
+name: CI - Prisma + Tests (backend)
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          cd platform/backend
+          cd backend
           npm ci
       - name: Start Postgres
         uses: harmon758/postgres-action@v2
@@ -30,13 +30,13 @@ jobs:
         env:
           DATABASE_URL: postgres://lead_radar:changeme@127.0.0.1:5432/lead_radar
         run: |
-          cd platform/backend
+          cd backend
           npx prisma generate
       - name: Push schema and seed
         env:
           DATABASE_URL: postgres://lead_radar:changeme@127.0.0.1:5432/lead_radar
         run: |
-          cd platform/backend
+          cd backend
           npx prisma db push --accept-data-loss
           node -e "require('@prisma/client');console.log('prisma client available')"
       - name: ADMIN_API_KEY placeholder check
