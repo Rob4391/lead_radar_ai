@@ -1,19 +1,14 @@
 import { NestFactory } from '@nestjs/core';
-import { Module, Controller, Get } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { LeadsController } from './leads.controller';
+import { LeadsService } from './leads.service';
 
-@Controller()
-class AppController {
-    @Get()
-    root() {
-        return { status: 'ok' };
-    }
-}
-
-@Module({ controllers: [AppController] })
+@Module({ controllers: [LeadsController], providers: [LeadsService] })
 class AppModule { }
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    app.enableCors();
     await app.listen(3001);
 }
 

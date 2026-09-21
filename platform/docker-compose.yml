@@ -15,7 +15,9 @@ services:
     image: node:20
     working_dir: /usr/src/app
     volumes:
-      - ./phase-5-stack/backend:/usr/src/app
+      - ./platform/backend:/usr/src/app
+    environment:
+      DATABASE_URL: postgres://lead_radar:changeme@db:5432/lead_radar
     command: sh -c "npm install && npm run dev"
     ports:
       - '3001:3001'
@@ -26,7 +28,7 @@ services:
     image: node:20
     working_dir: /usr/src/app
     volumes:
-      - ./phase-5-stack/frontend:/usr/src/app
+      - ./platform/frontend:/usr/src/app
     command: sh -c "npm install && npm run dev"
     ports:
       - '3000:3000'
