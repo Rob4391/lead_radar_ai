@@ -30,8 +30,34 @@ def extract_and_normalize(emails_field: str) -> List[str]:
 
 
 def dedupe_leads(leads: List[Dict]) -> List[Dict]:
-    """Deduplicate leads by email address; merge titles and urls for duplicates."""
+    """Deduplicate leads by email address; merge titles and urls for duplicates.
+
+    Output format for each unique lead:
+    {
+      "emails": [email1, email2, ...],
+      "urls": [url1, url2, ...],
+      "titles": [title1, title2, ...]
+    }
+    """
     seen: Dict[str, Dict] = {}
+    no_email_counter = 0
+
+    def add_lead_for_email(email_key: str, lead: Dict):
+        entry = seen.setdefault(email_key, {"emails": set(), "urls": [], "titles": []})
+        # emails
+        entry["emails"].add(email_key)
+        # urls
+        u = lead.get("url")
+        if u:
+            if isinstance(entry["urls"], list):
+                if u not in entry["urls"]:
+                    entry["urls"].append(u)
+        # titles
+        t = lead.get("title")
+        if t:
+            if t not in entry["titles"]:
+                entry["titles"].append(t)
+
     for lead in leads:
         emails = lead.get("emails") or []
         if isinstance(emails, str):
@@ -40,26 +66,24 @@ def dedupe_leads(leads: List[Dict]) -> List[Dict]:
             emails = [normalize_email(e) for e in emails]
 
         if not emails:
-            # keep leads without emails with a unique synthetic id
-            key = f"__noemail__::{lead.get('url','')}"
-            if key not in seen:
-                seen[key] = {"url": lead.get("url"), "title": lead.get("title"), "emails": []}
+            # keep leads without emails under a synthetic key
+            key = f"__noemail__::{no_email_counter}"
+            no_email_counter += 1
+            seen[key] = {"emails": set(), "urls": [lead.get("url")] if lead.get("url") else [], "titles": [lead.get("title")] if lead.get("title") else []}
             continue
 
         for e in emails:
-            if e in seen:
-                # merge urls/titles
-                if lead.get("url") and lead.get("url") not in (seen[e].get("url") or ""):
-                    # append URL to a list-like field
-                    prev = seen[e].get("url")
-                    if isinstance(prev, list):
-                        prev.append(lead.get("url"))
-                    else:
-                        seen[e]["url"] = [prev, lead.get("url")] if prev else lead.get("url")
-            else:
-                seen[e] = {"url": lead.get("url"), "title": lead.get("title"), "emails": [e]}
+            add_lead_for_email(e, lead)
 
-    return list(seen.values())
+    # convert sets to sorted lists for determinism
+    out: List[Dict] = []
+    for k, v in seen.items():
+        emails_list = sorted(v["emails"]) if v.get("emails") else []
+        urls = v.get("urls", [])
+        titles = v.get("titles", [])
+        out.append({"emails": emails_list, "urls": urls, "titles": titles})
+
+    return out
 
 
 def mx_check(email: str) -> bool:

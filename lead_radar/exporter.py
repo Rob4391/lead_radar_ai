@@ -13,9 +13,24 @@ def export_leads_to_csv(leads: List[Dict], path: str):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for lead in leads:
-            row = {
-                "url": lead.get("url", ""),
-                "title": lead.get("title", ""),
-                "emails": ";".join(lead.get("emails", [])) if lead.get("emails") else "",
-            }
+            # support new deduped format where leads have `urls`, `titles`, `emails`
+            emails = lead.get("emails") or []
+            if isinstance(emails, list):
+                emails_cell = ";".join(emails)
+            else:
+                emails_cell = str(emails)
+
+            urls = lead.get("urls") or []
+            if isinstance(urls, list):
+                url_cell = ";".join(urls)
+            else:
+                url_cell = str(urls)
+
+            titles = lead.get("titles") or []
+            if isinstance(titles, list):
+                title_cell = ";".join(titles)
+            else:
+                title_cell = str(titles)
+
+            row = {"url": url_cell, "title": title_cell, "emails": emails_cell}
             writer.writerow(row)
