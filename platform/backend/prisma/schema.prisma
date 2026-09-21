@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id       Int      @id @default(autoincrement())
+  name     String?
+  phone    String?
+  website  String?
+  emails   String[] @db.Text[]
+  urls     String[] @db.Text[]
+  titles   String[] @db.Text[]
+  city     String?
+  category String?
+  score    Float?   
+  createdAt DateTime @default(now())
+}
