@@ -14,6 +14,7 @@ def main(argv=None):
     parser.add_argument("--crawl", action="store_true", help="Perform polite crawl of targets")
     parser.add_argument("--max-pages", type=int, default=10, help="Maximum pages to crawl per target")
     parser.add_argument("--dedupe", action="store_true", help="Deduplicate collected leads and normalize emails")
+    parser.add_argument("--store", action="store_true", help="Persist deduped leads to local SQLite DB (leads.db)")
     parser.add_argument("--mx-check", action="store_true", help="Perform MX record validation for deduped emails (requires dnspython)")
     parser.add_argument("run", nargs="*", help="Run a subcommand or list of target URLs")
     args = parser.parse_args(argv)
@@ -56,6 +57,7 @@ def main(argv=None):
         if collected:
             if args.dedupe:
                 from lead_radar import validator
+                from lead_radar import storage
 
                 collected = validator.dedupe_leads(collected)
                 print(f"Deduplicated leads to {len(collected)} unique entries")
@@ -73,6 +75,12 @@ def main(argv=None):
                             verified.append(lead)
                     collected = verified
                     print(f"After MX-check, {len(collected)} leads remain")
+
+                if args.store:
+                    db_path = "leads.db"
+                    storage.init_db(db_path)
+                    storage.save_leads(db_path, collected)
+                    print(f"Stored {len(collected)} leads to {db_path}")
 
             out = "leads.csv"
             exporter.export_leads_to_csv(collected, out)
