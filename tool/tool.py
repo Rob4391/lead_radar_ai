@@ -13,6 +13,7 @@ def main(argv=None):
     parser.add_argument("--config", type=str, help="Path to config file")
     parser.add_argument("--crawl", action="store_true", help="Perform polite crawl of targets")
     parser.add_argument("--max-pages", type=int, default=10, help="Maximum pages to crawl per target")
+    parser.add_argument("--dedupe", action="store_true", help="Deduplicate collected leads and normalize emails")
     parser.add_argument("run", nargs="*", help="Run a subcommand or list of target URLs")
     args = parser.parse_args(argv)
 
@@ -52,6 +53,12 @@ def main(argv=None):
                     print(f"Error scanning {t}: {e}")
 
         if collected:
+            if args.dedupe:
+                from lead_radar import validator
+
+                collected = validator.dedupe_leads(collected)
+                print(f"Deduplicated leads to {len(collected)} unique entries")
+
             out = "leads.csv"
             exporter.export_leads_to_csv(collected, out)
             print(f"Exported {len(collected)} leads to {out}")
