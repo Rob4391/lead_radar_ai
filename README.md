@@ -15,6 +15,25 @@ git clone <your-remote>
 
 2. Edit project files and commit changes.
 
+## Usage
+
+Basic command-line usage:
+
+```powershell
+# scan a single URL and export leads
+lead-radar run https://example.com
+
+# polite crawl starting at a URL, dedupe results, then export
+lead-radar --crawl --dedupe run https://example.com
+
+# dedupe and perform MX validation (requires dnspython)
+lead-radar --dedupe --mx-check run https://example.com
+```
+
+Notes:
+- Deduped output shape: each CSV row contains `emails` (semicolon-separated), `urls` (semicolon-separated), and `titles` (semicolon-separated).
+- Leads with no emails are currently preserved under a synthetic grouping; a future change may export these separately.
+
 ## License
 This project is released under the MIT License. See the `LICENSE` file.
 # Lead Radar AI
