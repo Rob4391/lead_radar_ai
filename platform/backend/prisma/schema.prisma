@@ -12,9 +12,9 @@ model Lead {
   name     String?
   phone    String?
   website  String?
-  emails   String[] @db.Text[]
-  urls     String[] @db.Text[]
-  titles   String[] @db.Text[]
+  emails   String[]
+  urls     String[]
+  titles   String[]
   city     String?
   category String?
   score    Float?   
