@@ -17,6 +17,6 @@ model Lead {
   titles   String[]
   city     String?
   category String?
-  score    Float?   
+  score    Float?
   createdAt DateTime @default(now())
 }

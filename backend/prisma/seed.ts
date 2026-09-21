@@ -14,7 +14,7 @@ async function main() {
                 titles: ['Home'],
                 city: 'Ahmedabad',
                 category: 'Dentist',
-                score: 75.0,
+                score: 75,
             },
             {
                 name: 'XYZ Salon',
@@ -25,14 +25,18 @@ async function main() {
                 titles: ['Home'],
                 city: 'Ahmedabad',
                 category: 'Salon',
-                score: 60.0,
+                score: 60,
             },
         ],
+        skipDuplicates: true,
     });
 }
 
 main()
-    .catch(e => console.error(e))
+    .catch((e) => {
+        console.error(e);
+        process.exit(1);
+    })
     .finally(async () => {
         await prisma.$disconnect();
     });
