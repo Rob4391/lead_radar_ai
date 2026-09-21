@@ -17,10 +17,26 @@ jobs:
         run: |
           cd platform/backend
           npm ci
+      - name: Start Postgres
+        uses: harmon758/postgres-action@v2
+        with:
+          postgresql version: '15'
+          postgresql db: 'lead_radar'
+          postgresql username: 'lead_radar'
+          postgresql password: 'changeme'
       - name: Generate Prisma client
+        env:
+          DATABASE_URL: postgres://lead_radar:changeme@127.0.0.1:5432/lead_radar
         run: |
           cd platform/backend
           npx prisma generate
+      - name: Push schema and seed
+        env:
+          DATABASE_URL: postgres://lead_radar:changeme@127.0.0.1:5432/lead_radar
+        run: |
+          cd platform/backend
+          npx prisma db push --accept-data-loss
+          node -e "require('@prisma/client');console.log('prisma client available')"
       - name: Run lint/tests (placeholder)
         run: |
-          echo "No tests configured; consider adding integration tests"
+          echo "No tests configured yet; add integration tests to validate endpoints"
