@@ -31,7 +31,7 @@ export class LeadsController {
 
     @UseGuards(ApiKeyGuard)
     @Get('export')
-    async export(@Query('city') city?: string, @Query('category') category?: string, @Res() res?: Response) {
+    async export(@Res() res: Response, @Query('city') city?: string, @Query('category') category?: string) {
         const leads = await this.leadsService.findAll({ city, category });
         const header = ['name', 'phone', 'website', 'emails', 'urls', 'titles', 'city', 'category', 'score'];
 

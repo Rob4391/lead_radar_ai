@@ -18,6 +18,7 @@ services:
       - ./platform/backend:/usr/src/app
     environment:
       DATABASE_URL: postgres://lead_radar:changeme@db:5432/lead_radar
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
     command: sh -c "npm install && npm run dev"
     ports:
       - '3001:3001'
