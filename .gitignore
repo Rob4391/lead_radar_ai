@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+
+# Visual Studio Code
+.vscode/
+
+# OS files
+Thumbs.db
+.DS_Store
+node_modules/
+dist/
+.env
+*.log
+venv/
+__pycache__/
+.DS_Store
