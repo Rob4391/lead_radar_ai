@@ -14,6 +14,7 @@ def main(argv=None):
     parser.add_argument("--crawl", action="store_true", help="Perform polite crawl of targets")
     parser.add_argument("--max-pages", type=int, default=10, help="Maximum pages to crawl per target")
     parser.add_argument("--dedupe", action="store_true", help="Deduplicate collected leads and normalize emails")
+    parser.add_argument("--mx-check", action="store_true", help="Perform MX record validation for deduped emails (requires dnspython)")
     parser.add_argument("run", nargs="*", help="Run a subcommand or list of target URLs")
     args = parser.parse_args(argv)
 
@@ -58,6 +59,20 @@ def main(argv=None):
 
                 collected = validator.dedupe_leads(collected)
                 print(f"Deduplicated leads to {len(collected)} unique entries")
+                if args.mx_check:
+                    # perform MX checks and filter out invalid domains
+                    verified = []
+                    for lead in collected:
+                        emails = lead.get("emails") or []
+                        valid_emails = []
+                        for e in emails:
+                            if validator.mx_check(e):
+                                valid_emails.append(e)
+                        if valid_emails:
+                            lead["emails"] = valid_emails
+                            verified.append(lead)
+                    collected = verified
+                    print(f"After MX-check, {len(collected)} leads remain")
 
             out = "leads.csv"
             exporter.export_leads_to_csv(collected, out)
