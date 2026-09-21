@@ -18,3 +18,5 @@ dist/
 venv/
 __pycache__/
 .DS_Store
+phase-5-stack/node_modules/
+phase-5-stack/backend/dist/
