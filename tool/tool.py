@@ -19,15 +19,21 @@ def main(argv=None):
         return 0
 
     if args.run is not None:
-        from lead_radar import core
+        from lead_radar import core, exporter
         targets = args.run if args.run else []
+        collected = []
         for t in targets:
             print(f"Scanning: {t}")
             try:
                 res = core.find_leads_from_url(t)
                 print(res)
+                collected.append(res)
             except Exception as e:
                 print(f"Error scanning {t}: {e}")
+        if collected:
+            out = "leads.csv"
+            exporter.export_leads_to_csv(collected, out)
+            print(f"Exported {len(collected)} leads to {out}")
         return 0
 
     parser.print_help()
