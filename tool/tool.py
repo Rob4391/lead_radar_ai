@@ -76,6 +76,10 @@ def main(argv=None):
                     collected = verified
                     print(f"After MX-check, {len(collected)} leads remain")
 
+                # enrich and optionally store
+                from lead_radar import enrich
+                collected = enrich.enrich_leads(collected)
+
                 if args.store:
                     db_path = "leads.db"
                     storage.init_db(db_path)

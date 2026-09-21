@@ -12,3 +12,5 @@ def test_storage_roundtrip(tmp_path):
     out = storage.load_leads(str(db))
     assert len(out) == 1
     assert out[0]["emails"] == ["a@x.com"]
+    # score absent -> None
+    assert out[0].get("score") is None
