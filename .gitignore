@@ -20,3 +20,9 @@ __pycache__/
 .DS_Store
 phase-5-stack/node_modules/
 phase-5-stack/backend/dist/
+# Frontend build outputs
+platform/frontend/.next/
+
+# Local env files
+platform/backend/.env
+platform/frontend/.env
