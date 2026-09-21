@@ -19,13 +19,8 @@ jobs:
         run: |
           cd backend
           npm ci
-      - name: Start Postgres
-        uses: harmon758/postgres-action@v2
-        with:
-          postgresql version: '15'
-          postgresql db: 'lead_radar'
-          postgresql username: 'lead_radar'
-          postgresql password: 'changeme'
+      - name: Start Postgres (service)
+        run: echo "Postgres launched as service (see job services)"
       - name: Generate Prisma client
         env:
           DATABASE_URL: postgres://lead_radar:changeme@127.0.0.1:5432/lead_radar
@@ -49,3 +44,17 @@ jobs:
       - name: Run lint/tests (placeholder)
         run: |
           echo "No tests configured yet; add integration tests to validate endpoints"
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: lead_radar
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: lead_radar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
