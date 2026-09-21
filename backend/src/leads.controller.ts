@@ -18,7 +18,6 @@ class CreateLeadDto {
 export class LeadsController {
     constructor(private readonly leadsService: LeadsService) { }
 
-    // Example: /leads?city=Ahmedabad&category=Dentist
     @Get()
     async list(@Query('city') city?: string, @Query('category') category?: string) {
         return this.leadsService.findAll({ city, category });
