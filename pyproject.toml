@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lead_radar_ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lead Radar AI - phase 1"
 authors = ["Robin <robin@example.com>"]
 packages = [

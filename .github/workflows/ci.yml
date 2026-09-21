@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, phase-1, phase-2 ]
+    branches: [ main, phase-1, phase-2, phase-4 ]
   pull_request:
     branches: [ main ]
 
@@ -23,6 +23,10 @@ jobs:
       - name: Install package
         run: |
           pip install -e .
+      - name: Run integration tests dependencies
+        run: |
+          # ensure optional test tools are available
+          pip install responses
       - name: Run tests
         run: |
           pytest -q
