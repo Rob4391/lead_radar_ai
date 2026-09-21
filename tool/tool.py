@@ -19,8 +19,15 @@ def main(argv=None):
         return 0
 
     if args.run is not None:
-        print("Running phase-1 tool with args:", args.run)
-        # TODO: implement core lead discovery flow here
+        from lead_radar import core
+        targets = args.run if args.run else []
+        for t in targets:
+            print(f"Scanning: {t}")
+            try:
+                res = core.find_leads_from_url(t)
+                print(res)
+            except Exception as e:
+                print(f"Error scanning {t}: {e}")
         return 0
 
     parser.print_help()
