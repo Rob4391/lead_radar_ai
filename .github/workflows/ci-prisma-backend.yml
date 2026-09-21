@@ -18,7 +18,13 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          npm ci
+          # Use npm ci when a lockfile exists for reproducible installs,
+          # otherwise fall back to npm install (useful for branches without lockfile).
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
       - name: Start Postgres (service)
         run: echo "Postgres launched as service (see job services)"
       - name: Generate Prisma client
