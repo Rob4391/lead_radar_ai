@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,6 +10,7 @@ datasource db {
 
 model Lead {
   id       Int      @id @default(autoincrement())
+  placeId  String?  @unique
   name     String?
   phone    String?
   website  String?
@@ -17,6 +19,9 @@ model Lead {
   titles   String[]
   city     String?
   category String?
+  reviewCount Int?
+  instagram String?
+  facebook String?
   score    Float?
   createdAt DateTime @default(now())
 }

@@ -1,5 +1,13 @@
 version: '3.8'
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
   db:
     image: postgres:15
     environment:
@@ -16,14 +24,18 @@ services:
     working_dir: /usr/src/app
     volumes:
       - ./backend:/usr/src/app
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgres://lead_radar:changeme@db:5432/lead_radar
+      REDIS_URL: redis://redis:6379
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
     command: sh -c "npm install && npm run dev"
     ports:
       - '3001:3001'
     depends_on:
       - db
+      - redis
 
   frontend:
     image: node:20
@@ -37,4 +49,5 @@ services:
       - backend
 
 volumes:
+  redis-data:
   db-data:
