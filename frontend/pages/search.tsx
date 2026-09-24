@@ -9,6 +9,12 @@ export default function Search() {
     const [leads, setLeads] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [limitReached, setLimitReached] = useState(false);
+    const [usage, setUsage] = useState<any>(null);
+
+    useEffect(() => {
+        fetch('/api/proxy/billing/status').then(r => (r.ok ? r.json() : null)).then(setUsage).catch(() => { });
+    }, [leads]);
 
     useEffect(() => {
         if (!city && !category) return;
@@ -17,6 +23,8 @@ export default function Search() {
         if (category) payload.category = String(category);
         setIsLoading(true);
         setError('');
+        setLimitReached(false);
+        let hitLimit = false;
 
         const pollJobStatus = (jobId: string) => {
             const poll = async () => {
@@ -54,7 +62,13 @@ export default function Search() {
         })
             .then(async r => {
                 const data = await r.json();
-                if (!r.ok) throw new Error(data.error || 'Unable to collect leads.');
+                if (!r.ok) {
+                    if (r.status === 403) {
+                        hitLimit = true;
+                        setLimitReached(true);
+                    }
+                    throw new Error(data.message || data.error || 'Unable to collect leads.');
+                }
                 return data;
             })
             .then(data => {
@@ -73,7 +87,13 @@ export default function Search() {
                 setLeads([]);
                 setIsLoading(false);
             })
-            .catch(() => {
+            .catch((err: Error) => {
+                // A limit-reached error is real and final; don't mask it with a cached-results fallback.
+                if (hitLimit) {
+                    setError(err.message);
+                    setIsLoading(false);
+                    return;
+                }
                 // fallback to simple GET if POST fails
                 const q = new URLSearchParams();
                 if (city) q.set('city', String(city));
@@ -81,7 +101,7 @@ export default function Search() {
                 fetch(`/api/proxy/leads?${q.toString()}`)
                     .then(async r => {
                         const data = await r.json();
-                        if (!r.ok) throw new Error(data.error || 'Unable to load leads.');
+                        if (!r.ok) throw new Error(data.message || data.error || 'Unable to load leads.');
                         return data;
                     })
                     .then(data => setLeads(Array.isArray(data) ? data : data.value || []))
@@ -101,6 +121,11 @@ export default function Search() {
                         <p className="font-bold leading-tight text-slate-900">Lead Radar</p>
                         <p className="text-sm text-slate-500">Search results</p>
                     </div>
+                    {usage && (
+                        <Link href="/pricing" className="ml-auto text-xs font-medium text-slate-400 hover:text-brand-700">
+                            {usage.searchLimit === null ? 'Unlimited searches' : `${usage.remaining ?? 0}/${usage.searchLimit} searches left`}
+                        </Link>
+                    )}
                 </header>
 
                 <section className="mt-6">
@@ -136,7 +161,12 @@ export default function Search() {
                             )}
                             {!isLoading && error && (
                                 <div className="col-span-full rounded-xl border border-red-200 bg-red-50 p-8 text-center text-red-700">
-                                    {error}
+                                    <p>{error}</p>
+                                    {limitReached && (
+                                        <Link href="/pricing" className="btn mt-4 inline-block">
+                                            Upgrade plan
+                                        </Link>
+                                    )}
                                 </div>
                             )}
                             {!isLoading && !error && leads.length === 0 && (

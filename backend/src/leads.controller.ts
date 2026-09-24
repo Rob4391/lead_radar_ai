@@ -1,5 +1,5 @@
-import { Controller, Get, Query, Post, Body, Res, UseGuards, Param, NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, Post, Body, Res, Req, UseGuards, Param, NotFoundException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import { Response, Request } from 'express';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
 import { ApiKeyGuard } from './api-key.guard';
@@ -7,6 +7,7 @@ import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
 import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
 import { OutreachService } from './outreach/outreach.service';
+import { SubscriptionService } from './billing/subscription.service';
 
 class CreateLeadDto {
     name?: string;
@@ -26,6 +27,7 @@ export class LeadsController {
         private readonly leadsService: LeadsService,
         private readonly placesService: PlacesService,
         private readonly outreachService: OutreachService,
+        private readonly subscriptionService: SubscriptionService,
         @InjectQueue('lead-collection') private leadQueue: Queue,
     ) { }
 
@@ -40,7 +42,7 @@ export class LeadsController {
     }
 
     @Post('collect')
-    async collect(@Body() dto: { city: string; category: string }) {
+    async collect(@Req() req: Request & { auth?: { userId: string } }, @Body() dto: { city: string; category: string }) {
         console.log(`[Collect] Request for ${dto.city} / ${dto.category}`);
 
         // Check cache first
@@ -51,6 +53,16 @@ export class LeadsController {
             return existing;
         }
 
+        // Only Clerk-authenticated requests carry req.auth; the legacy x-api-key
+        // path (scripts/CI) bypasses the monthly search limit entirely.
+        const userId = req.auth?.userId;
+        if (userId) {
+            const allowed = await this.subscriptionService.canSearch(userId);
+            if (!allowed) {
+                throw new ForbiddenException('Monthly search limit reached for your plan. Upgrade to continue.');
+            }
+        }
+
         // Queue background collection job
         const job = await this.leadQueue.add(dto, {
             removeOnComplete: false,  // Keep job in queue so we can poll its status
@@ -59,6 +71,9 @@ export class LeadsController {
         });
 
         console.log(`[Collect] Queued job ${job.id} for ${dto.city} / ${dto.category}`);
+        if (userId) {
+            await this.subscriptionService.recordSearch(userId);
+        }
         // Return job ID for polling; frontend can call /leads/collect-status/:jobId
         return { jobId: job.id, message: `Finding leads in ${dto.city}...`, status: 'queued' };
     }

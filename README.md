@@ -121,6 +121,9 @@ curl "localhost:3001/leads/export?city=Ahmedabad&category=Dentist" \
 
 # Generate outreach messages for a lead (cached; add ?force=true to regenerate)
 curl -X POST localhost:3001/leads/17/outreach -H "x-api-key: $ADMIN_API_KEY"
+
+# List pricing tiers (public, no auth)
+curl localhost:3001/billing/plans
 ```
 
 From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/leads/*`.
@@ -134,7 +137,28 @@ Every `/leads/*` route is guarded (`ApiKeyGuard`, [`backend/src/api-key.guard.ts
 1. **A Clerk session token** — `Authorization: Bearer <token>`, verified server-side against `CLERK_SECRET_KEY`. This is what the frontend sends automatically for signed-in users.
 2. **`x-api-key: <ADMIN_API_KEY>`** — a legacy/admin bypass for internal scripts, seeding, and CI, where there's no logged-in Clerk user.
 
-On the frontend, `middleware.ts` enforces sign-in on `/search` and `/api/proxy/*` — an anonymous visitor is redirected to sign-in before ever reaching a lead.
+On the frontend, `middleware.ts` enforces sign-in on `/search`, `/pricing`, and `/api/proxy/*` — an anonymous visitor is redirected to sign-in before ever reaching a lead.
+
+---
+
+## Billing
+
+Pricing tiers gate the number of new searches per 30-day period (cached results don't count):
+
+| Plan | Price | Searches/month |
+|---|---|---|
+| Free | ₹0 | 10 |
+| Starter | ₹999 | 50 |
+| Growth | ₹2,999 | 250 |
+| Agency | ₹9,999 | Unlimited |
+
+Every signed-in user is granted the **Free** plan automatically on first use — no checkout, no payment. Unlike the paid tiers (which expire after 30 days and need repurchasing), Free auto-renews forever. It exists purely so the app is usable without needing a Razorpay account; `GET /billing/plans` deliberately excludes it since it isn't something to buy.
+
+Checkout for the paid tiers runs through Razorpay in **test mode** (free — no KYC or real payment method needed to build/test against it). Flow: `/pricing` → `POST /billing/checkout` creates a Razorpay order → Razorpay's Checkout widget collects a (fake, in test mode) payment → the client posts the result to `POST /billing/verify`, which checks the HMAC signature server-side and activates the plan for 30 days.
+
+This is intentionally *not* Razorpay's native recurring Subscriptions API — each successful payment buys a flat 30-day period with no auto-renewal. Simpler to build and test; upgrading to real recurring billing later is a contained change in [`backend/src/billing/`](backend/src/billing/).
+
+`POST /billing/webhook` exists and verifies Razorpay's webhook signature, but isn't load-bearing for activation yet (that happens synchronously via `/billing/verify`) — it's there so a real webhook integration (e.g. handling failed renewals) has a secure landing point already wired up.
 
 ---
 
@@ -150,6 +174,8 @@ On the frontend, `middleware.ts` enforces sign-in on `/search` and `/api/proxy/*
 | `REDIS_URL` | backend | Bull job queue |
 | `ANTHROPIC_API_KEY` | backend | AI outreach message generation |
 | `ANTHROPIC_MODEL` | backend | Optional override (default `claude-sonnet-5`) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | backend | Billing checkout (free test-mode keys) |
+| `RAZORPAY_WEBHOOK_SECRET` | backend | Verifies `POST /billing/webhook` signatures |
 | `BACKEND_URL` | frontend | Where `/api/proxy/*` forwards requests |
 
 See [`backend/.env.example`](backend/.env.example).
@@ -159,7 +185,7 @@ See [`backend/.env.example`](backend/.env.example).
 ## Tests
 
 ```bash
-cd backend && npm test        # scoring, CSV formatting, auth guard, Places API client, outreach generation
+cd backend && npm test        # scoring, CSV formatting, auth guard, Places API client, outreach, billing
 cd frontend && npx tsc --noEmit   # typecheck
 ```
 
@@ -172,7 +198,7 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 1** — Landing page, auth, search UI, database
 - [x] **Week 2** — Data collection pipeline, lead database
 - [x] **Week 3** — Opportunity scoring, CSV export
-- [~] **Week 4** — AI outreach message generator ✅ (cold email / LinkedIn / WhatsApp via Claude), Stripe/Razorpay billing (pending)
+- [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp via Claude), Razorpay billing with monthly search limits
 
 ---
 
