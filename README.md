@@ -3,7 +3,7 @@
 [![CI](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml/badge.svg)](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-20.x-339933?logo=node.js&logoColor=white)](backend/package.json)
-[![Next.js](https://img.shields.io/badge/frontend-Next.js%2014-black?logo=next.js)](frontend/package.json)
+[![Next.js](https://img.shields.io/badge/frontend-Next.js%2016-black?logo=next.js)](frontend/package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](backend/package.json)
 
 **Find local businesses that need marketing help — before your competitors do.**
@@ -33,28 +33,43 @@ Implementation: [`backend/src/scoring.ts`](backend/src/scoring.ts) · unit tests
 
 ---
 
+## Online Presence Audit
+
+`POST /leads/:id/audit` checks a lead's actual website for concrete, pitchable problems — all free, no headless browser:
+
+| Check | How |
+|---|---|
+| Website age | Wayback Machine's `available` API (earliest snapshot on record) |
+| Mobile-friendly | Regex for a `<meta name="viewport">` tag on the homepage |
+| Slow load | Google PageSpeed Insights (optional — skipped if `PAGESPEED_API_KEY` isn't set) |
+| Broken links | Plain HTTP `HEAD` requests against up to 5 internal links |
+
+Results cache on the `Lead` row (`auditedAt` + the individual fields); pass `?force=true` to re-run. Implementation: [`backend/src/audit/`](backend/src/audit/).
+
+---
+
 ## Architecture
 
 ```
-┌────────────┐   sign-in (Clerk)   ┌───────────────────┐
-│  Next.js    │ ──────────────────▶ │  /api/proxy/leads  │  (forwards Clerk session token)
-│  frontend   │ ◀────────────────── │  Next.js API route │
-└────────────┘        JSON/CSV      └─────────┬──────────┘
-                                               │ Bearer <token>
-                                               ▼
-                                  ┌─────────────────────────┐
-                                  │   NestJS backend          │
-                                  │   ApiKeyGuard verifies     │
-                                  │   Clerk token or           │
-                                  │   x-api-key (CI/admin)     │
-                                  └───────────┬─────────────┘
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    ▼                         ▼                         ▼
-            ┌───────────────┐        ┌────────────────┐        ┌───────────────┐
-            │ Bull + Redis  │        │  Google Places  │        │  PostgreSQL    │
-            │ job queue     │──────▶ │  API             │──────▶ │  via Prisma    │
-            └───────────────┘        └────────────────┘        └───────────────┘
+┌────────────┐     Clerk sign-in     ┌──────────────────────┐
+│  Next.js   │  ──────────────────▶  │   /api/proxy/leads   │
+│  frontend  │  ◀──────────────────  │ (Next.js API route)  │
+└────────────┘      JSON / CSV       └──────────────────────┘
+                                                 │ Authorization: Bearer <token>
+                                                 ▼
+                                     ┌──────────────────────┐
+                                     │    NestJS backend    │
+                                     │ ApiKeyGuard verifies  │
+                                     │    Clerk token or     │
+                                     │ x-api-key (CI/admin)  │
+                                     └──────────────────────┘
+                                                 │
+                             ┌───────────────────┬───────────────────┐
+                             ▼                   ▼                   ▼
+                     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+                     │ Bull + Redis  │   │ Google Places │   │  PostgreSQL   │
+                     │   job queue   │ ▶ │      API      │ ▶ │  via Prisma   │
+                     └───────────────┘   └───────────────┘   └───────────────┘
 ```
 
 A search enqueues a collection job; the job fetches businesses from Google Places, computes an opportunity score for each, and upserts them into Postgres. The frontend polls the job until it's done, then renders results and offers a CSV export.
@@ -122,6 +137,9 @@ curl "localhost:3001/leads/export?city=Ahmedabad&category=Dentist" \
 # Generate outreach messages for a lead (cached; add ?force=true to regenerate)
 curl -X POST localhost:3001/leads/17/outreach -H "x-api-key: $ADMIN_API_KEY"
 
+# Audit a lead's website (cached; add ?force=true to re-audit)
+curl -X POST localhost:3001/leads/17/audit -H "x-api-key: $ADMIN_API_KEY"
+
 # List pricing tiers (public, no auth)
 curl localhost:3001/billing/plans
 ```
@@ -177,6 +195,7 @@ This is intentionally *not* Razorpay's native recurring Subscriptions API — ea
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | backend | Only used when `LLM_PROVIDER=anthropic` (paid API, default `claude-sonnet-5`) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | backend | Billing checkout (free test-mode keys) |
 | `RAZORPAY_WEBHOOK_SECRET` | backend | Verifies `POST /billing/webhook` signatures |
+| `PAGESPEED_API_KEY` | backend | Optional — enables the audit's slow-load check via Google PageSpeed Insights |
 | `BACKEND_URL` | frontend | Where `/api/proxy/*` forwards requests |
 
 See [`backend/.env.example`](backend/.env.example).
@@ -200,6 +219,8 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 2** — Data collection pipeline, lead database
 - [x] **Week 3** — Opportunity scoring, CSV export
 - [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp, free via local Ollama or Claude), Razorpay billing with monthly search limits
+- [x] **Week 5** — Online Presence Audit (website age, mobile-friendliness, broken links), WhatsApp click-to-chat deep-link
+- [ ] **Week 6** — Competitor benchmarking (top 2-3 local competitors per lead), Proposal Generator (AI scope + pricing proposal, built on Week 5's audit findings)
 
 ---
 
