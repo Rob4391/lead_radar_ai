@@ -43,4 +43,5 @@ npm run dev
 
 Notes:
 - Do not commit `backend/.env` — it is included in `.gitignore`.
-- To protect the `/leads/export` endpoint in CI, set a repository secret `ADMIN_API_KEY` and add it to the backend workflow env.
+- All `/leads/*` routes require either a Clerk session token (`Authorization: Bearer <token>`, verified against `CLERK_SECRET_KEY`) or the legacy `x-api-key: <ADMIN_API_KEY>` header for scripts/CI. See `.env.example` for the full list of required variables.
+- The frontend's `/api/proxy/leads/*` routes fetch and forward the signed-in user's Clerk token automatically — the browser never needs to know about `CLERK_SECRET_KEY` or `ADMIN_API_KEY`.
