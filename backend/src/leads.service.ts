@@ -63,4 +63,11 @@ export class LeadsService implements OnModuleInit {
             data: { ...messages, outreachGeneratedAt: new Date() },
         });
     }
+
+    async saveAudit(id: number, audit: { websiteAgeYears: number | null; isOldWebsite: boolean; mobileFriendly: boolean; isSlowLoad: boolean; hasBrokenPages: boolean }) {
+        return this.prisma.lead.update({
+            where: { id },
+            data: { ...audit, auditedAt: new Date() },
+        });
+    }
 }

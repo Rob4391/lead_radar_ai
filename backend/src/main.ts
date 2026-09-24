@@ -9,6 +9,7 @@ import { OutreachService } from './outreach/outreach.service';
 import { BillingController } from './billing/billing.controller';
 import { RazorpayService } from './billing/razorpay.service';
 import { SubscriptionService } from './billing/subscription.service';
+import { AuditService } from './audit/audit.service';
 
 @Module({
     imports: [
@@ -33,7 +34,7 @@ import { SubscriptionService } from './billing/subscription.service';
         BullModule.registerQueue({ name: 'lead-collection' }),
     ],
     controllers: [LeadsController, BillingController],
-    providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService, RazorpayService, SubscriptionService],
+    providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService, RazorpayService, SubscriptionService, AuditService],
 })
 class AppModule { }
 
