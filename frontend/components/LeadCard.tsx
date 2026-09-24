@@ -83,8 +83,15 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         }
     };
 
+    const normalizeIndianPhone = (raw: string): string => {
+        const digits = raw.replace(/[^0-9]/g, '');
+        if (digits.startsWith('91') && digits.length === 12) return digits;
+        const local = digits.replace(/^0+/, '');
+        return `91${local}`;
+    };
+
     const whatsappLink = lead.phone
-        ? `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}${messages ? `?text=${encodeURIComponent(messages.whatsappMessage)}` : ''}`
+        ? `https://wa.me/${normalizeIndianPhone(lead.phone)}${messages ? `?text=${encodeURIComponent(messages.whatsappMessage)}` : ''}`
         : null;
 
     const generate = async (force = false) => {
