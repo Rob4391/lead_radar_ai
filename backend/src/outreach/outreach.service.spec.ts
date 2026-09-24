@@ -11,12 +11,67 @@ jest.mock('@anthropic-ai/sdk', () => {
 
 import { OutreachService } from './outreach.service';
 
-describe('OutreachService', () => {
+describe('OutreachService (Ollama, the default provider)', () => {
+    const originalEnv = process.env;
+    const originalFetch = global.fetch;
+
+    beforeEach(() => {
+        process.env = { ...originalEnv };
+        delete process.env.LLM_PROVIDER;
+    });
+
+    afterEach(() => {
+        process.env = originalEnv;
+        global.fetch = originalFetch;
+    });
+
+    it('parses a successful response into outreach messages', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ response: '{"coldEmail": "a", "linkedinMessage": "b", "whatsappMessage": "c"}' }),
+        }) as any;
+
+        const service = new OutreachService();
+        const result = await service.generateMessages({ name: 'Test Biz', website: null, reviewCount: 0 });
+
+        expect(result).toEqual({ coldEmail: 'a', linkedinMessage: 'b', whatsappMessage: 'c' });
+        expect(global.fetch).toHaveBeenCalledWith(
+            'http://localhost:11434/api/generate',
+            expect.objectContaining({ method: 'POST' }),
+        );
+    });
+
+    it('throws a clear error when Ollama is unreachable', async () => {
+        global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as any;
+        const service = new OutreachService();
+        await expect(service.generateMessages({ name: 'Test Biz' })).rejects.toThrow('Could not reach Ollama');
+    });
+
+    it('throws when Ollama responds with a non-OK status', async () => {
+        global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'model not found' }) as any;
+        const service = new OutreachService();
+        await expect(service.generateMessages({ name: 'Test Biz' })).rejects.toThrow('status 500');
+    });
+
+    it('throws when the response has no "response" field', async () => {
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as any;
+        const service = new OutreachService();
+        await expect(service.generateMessages({ name: 'Test Biz' })).rejects.toThrow('did not include a "response" field');
+    });
+
+    it('propagates a parse error for a malformed response', async () => {
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ response: 'not json at all' }) }) as any;
+        const service = new OutreachService();
+        await expect(service.generateMessages({ name: 'Test Biz' })).rejects.toThrow('did not contain a JSON object');
+    });
+});
+
+describe('OutreachService (Anthropic, opt-in via LLM_PROVIDER=anthropic)', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        process.env = { ...originalEnv, ANTHROPIC_API_KEY: 'sk-ant-test' };
+        process.env = { ...originalEnv, LLM_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'sk-ant-test' };
     });
 
     afterAll(() => {

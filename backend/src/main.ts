@@ -6,6 +6,9 @@ import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
 import { LeadCollectionProcessor } from './jobs/lead-collection.processor';
 import { OutreachService } from './outreach/outreach.service';
+import { BillingController } from './billing/billing.controller';
+import { RazorpayService } from './billing/razorpay.service';
+import { SubscriptionService } from './billing/subscription.service';
 
 @Module({
     imports: [
@@ -29,13 +32,13 @@ import { OutreachService } from './outreach/outreach.service';
         }),
         BullModule.registerQueue({ name: 'lead-collection' }),
     ],
-    controllers: [LeadsController],
-    providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService],
+    controllers: [LeadsController, BillingController],
+    providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService, RazorpayService, SubscriptionService],
 })
 class AppModule { }
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, { rawBody: true });
     app.enableCors();
     await app.listen(3001);
 }

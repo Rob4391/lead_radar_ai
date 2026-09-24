@@ -40,7 +40,11 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         setIsGenerating(true);
         setError('');
         try {
-            const res = await fetch(`/api/proxy/leads/${lead.id}/outreach${force ? '?force=true' : ''}`, { method: 'POST' });
+            const res = await fetch(`/api/proxy/leads/${lead.id}/outreach${force ? '?force=true' : ''}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Failed to generate outreach messages.');
             setMessages({ coldEmail: data.coldEmail, linkedinMessage: data.linkedinMessage, whatsappMessage: data.whatsappMessage });
