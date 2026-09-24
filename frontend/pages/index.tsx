@@ -52,7 +52,7 @@ export default function Home() {
                     <div className="card">
                         <div className="mb-2 text-2xl">🔒</div>
                         <h3 className="font-semibold text-slate-900">Protected access</h3>
-                        <p className="mt-1 text-sm text-slate-500">Export endpoints are secured with API key authentication.</p>
+                        <p className="mt-1 text-sm text-slate-500">Search and export are gated behind sign-in and verified on the backend.</p>
                     </div>
                 </section>
 

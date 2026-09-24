@@ -5,6 +5,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { ApiKeyGuard } from './api-key.guard';
 import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
+import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
 
 class CreateLeadDto {
     name?: string;
@@ -17,6 +18,7 @@ class CreateLeadDto {
     category?: string;
 }
 
+@UseGuards(ApiKeyGuard)
 @Controller('leads')
 export class LeadsController {
     constructor(
@@ -91,32 +93,23 @@ export class LeadsController {
         return { status: state, progress, jobId };
     }
 
-    @UseGuards(ApiKeyGuard)
     @Post('score')
     async score(@Body() dto: { city?: string; category?: string }) {
         const updated = await this.leadsService.scoreLeads({ city: dto?.city, category: dto?.category });
         return { message: `Scored ${updated.length} lead(s)`, count: updated.length };
     }
 
-    @UseGuards(ApiKeyGuard)
     @Get('export')
     async export(@Res() res: Response, @Query('city') city?: string, @Query('category') category?: string) {
         const leads = await this.leadsService.findAll({ city, category });
-        const header = ['name', 'phone', 'website', 'emails', 'urls', 'titles', 'city', 'category', 'reviewCount', 'instagram', 'facebook', 'score'];
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         const filenameParts = ['leads', city || 'all', category || 'all'];
         res.setHeader('Content-Disposition', `attachment; filename="${filenameParts.join('-')}.csv"`);
 
-        res.write(header.join(',') + '\n');
-        for (const l of leads) {
-            const emails = (l.emails || []).join(';');
-            const urls = (l.urls || []).join(';');
-            const titles = (l.titles || []).join(';');
-            const row = [l.name || '', l.phone || '', l.website || '', emails, urls, titles, l.city || '', l.category || '', l.reviewCount ?? '', l.instagram || '', l.facebook || '', l.score ?? '']
-                .map(v => String(v).replace(/\n/g, ' '))
-                .map(c => `"${c.replace(/"/g, '""')}"`).join(',');
-            res.write(row + '\n');
+        res.write(LEAD_CSV_HEADER.join(',') + '\n');
+        for (const lead of leads) {
+            res.write(leadToCsvRow(lead) + '\n');
         }
         res.end();
         return res;

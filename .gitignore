@@ -1,9 +1,11 @@
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Python
 __pycache__/
+venv/
 
 # Visual Studio Code
 .vscode/
@@ -11,20 +13,16 @@ __pycache__/
 # OS files
 Thumbs.db
 .DS_Store
-node_modules/
-dist/
+
+# Env files
 .env
 .env.local
 .env*.local
 *.log
-venv/
-__pycache__/
-.DS_Store
-phase-5-stack/node_modules/
-phase-5-stack/backend/dist/
-# Frontend build outputs
-platform/frontend/.next/
+
+# Frontend build output
+frontend/.next/
 
 # Local env files
-platform/backend/.env
-platform/frontend/.env
+backend/.env
+frontend/.env
