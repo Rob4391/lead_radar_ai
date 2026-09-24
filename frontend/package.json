@@ -13,6 +13,10 @@
         "react": "18.2.0",
         "react-dom": "18.2.0"
     },
+    "overrides": {
+        "js-cookie": "^3.0.7",
+        "@clerk/clerk-react": "^5.61.6"
+    },
     "devDependencies": {
         "@types/node": "26.6.2",
         "@types/react": "19.3.0",
