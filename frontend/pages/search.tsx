@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import LeadCard from '../components/LeadCard';
 
 export default function Search() {
     const router = useRouter();
@@ -144,26 +145,7 @@ export default function Search() {
                                 </div>
                             )}
                             {!isLoading && !error && leads.map((l, i) => (
-                                <div className="rounded-xl border border-slate-100 bg-gradient-to-b from-white to-brand-50/40 p-4 shadow-sm transition hover:shadow-md" key={i}>
-                                    <div className="flex items-start justify-between gap-2">
-                                        <strong className="text-slate-900">{l.name}</strong>
-                                        <span className="badge">{l.city}</span>
-                                    </div>
-                                    <div className="mt-1 text-sm text-slate-500">{l.category}</div>
-                                    {typeof l.score === 'number' && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-xs uppercase tracking-wide text-slate-400">Opportunity</span>
-                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${l.score >= 70 ? 'bg-emerald-100 text-emerald-700' : l.score >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                {Math.round(l.score)}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {l.website && (
-                                        <a className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline" href={l.website} target="_blank" rel="noreferrer">
-                                            {l.website}
-                                        </a>
-                                    )}
-                                </div>
+                                <LeadCard lead={l} key={l.id ?? i} />
                             ))}
                         </div>
                     </div>

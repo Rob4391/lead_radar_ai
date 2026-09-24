@@ -5,6 +5,7 @@ import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
 import { LeadCollectionProcessor } from './jobs/lead-collection.processor';
+import { OutreachService } from './outreach/outreach.service';
 
 @Module({
     imports: [
@@ -29,7 +30,7 @@ import { LeadCollectionProcessor } from './jobs/lead-collection.processor';
         BullModule.registerQueue({ name: 'lead-collection' }),
     ],
     controllers: [LeadsController],
-    providers: [LeadsService, PlacesService, LeadCollectionProcessor],
+    providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService],
 })
 class AppModule { }
 

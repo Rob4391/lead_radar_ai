@@ -24,4 +24,9 @@ model Lead {
   facebook String?
   score    Float?
   createdAt DateTime @default(now())
+
+  coldEmail        String?
+  linkedinMessage  String?
+  whatsappMessage  String?
+  outreachGeneratedAt DateTime?
 }
