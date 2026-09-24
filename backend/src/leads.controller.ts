@@ -8,6 +8,7 @@ import { PlacesService } from './places/places.service';
 import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
 import { OutreachService } from './outreach/outreach.service';
 import { SubscriptionService } from './billing/subscription.service';
+import { AuditService } from './audit/audit.service';
 
 class CreateLeadDto {
     name?: string;
@@ -28,6 +29,7 @@ export class LeadsController {
         private readonly placesService: PlacesService,
         private readonly outreachService: OutreachService,
         private readonly subscriptionService: SubscriptionService,
+        private readonly auditService: AuditService,
         @InjectQueue('lead-collection') private leadQueue: Queue,
     ) { }
 
@@ -136,6 +138,36 @@ export class LeadsController {
             const messages = await this.outreachService.generateMessages(lead);
             await this.leadsService.saveOutreach(lead.id, messages);
             return { ...messages, cached: false };
+        } catch (err) {
+            throw new InternalServerErrorException((err as Error).message);
+        }
+    }
+
+    @Post(':id/audit')
+    async auditLead(@Param('id') id: string, @Query('force') force?: string) {
+        const lead = await this.leadsService.findById(Number(id));
+        if (!lead) {
+            throw new NotFoundException(`Lead ${id} not found`);
+        }
+        if (!lead.website) {
+            throw new InternalServerErrorException('Lead has no website to audit');
+        }
+
+        if (!force && lead.auditedAt) {
+            return {
+                websiteAgeYears: lead.websiteAgeYears,
+                isOldWebsite: lead.isOldWebsite,
+                mobileFriendly: lead.mobileFriendly,
+                isSlowLoad: lead.isSlowLoad,
+                hasBrokenPages: lead.hasBrokenPages,
+                cached: true,
+            };
+        }
+
+        try {
+            const audit = await this.auditService.auditWebsite(lead.website);
+            await this.leadsService.saveAudit(lead.id, audit);
+            return { ...audit, cached: false };
         } catch (err) {
             throw new InternalServerErrorException((err as Error).message);
         }

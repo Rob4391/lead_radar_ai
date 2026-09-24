@@ -28,9 +28,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Install dependencies
@@ -43,6 +43,12 @@ jobs:
           else
             npm install
           fi
+      # continue-on-error: existing bull/uuid advisory has no upstream fix yet.
+      # Reported on every run so it stays visible without blocking merges.
+      - name: Audit dependencies
+        working-directory: backend
+        run: npm audit --audit-level=high
+        continue-on-error: true
       - name: Generate Prisma client
         working-directory: backend
         run: npx prisma generate
@@ -59,9 +65,9 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Install dependencies
@@ -72,6 +78,12 @@ jobs:
           else
             npm install
           fi
+      # continue-on-error: fixing the current Next.js advisory needs a major-version
+      # upgrade (next@16), tracked as its own task rather than rushed here.
+      - name: Audit dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+        continue-on-error: true
       - name: Typecheck
         working-directory: frontend
         run: npx tsc -p tsconfig.json --noEmit

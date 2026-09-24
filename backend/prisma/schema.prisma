@@ -29,6 +29,13 @@ model Lead {
   linkedinMessage  String?
   whatsappMessage  String?
   outreachGeneratedAt DateTime?
+
+  websiteAgeYears Float?
+  isOldWebsite    Boolean?
+  mobileFriendly  Boolean?
+  isSlowLoad      Boolean?
+  hasBrokenPages  Boolean?
+  auditedAt       DateTime?
 }
 
 enum Plan {

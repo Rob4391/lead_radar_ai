@@ -6,9 +6,18 @@ interface OutreachMessages {
     whatsappMessage: string;
 }
 
+interface AuditResult {
+    websiteAgeYears: number | null;
+    isOldWebsite: boolean;
+    mobileFriendly: boolean;
+    isSlowLoad: boolean;
+    hasBrokenPages: boolean;
+}
+
 interface Lead {
     id: number;
     name?: string;
+    phone?: string;
     city?: string;
     category?: string;
     website?: string;
@@ -16,6 +25,12 @@ interface Lead {
     coldEmail?: string;
     linkedinMessage?: string;
     whatsappMessage?: string;
+    websiteAgeYears?: number | null;
+    isOldWebsite?: boolean;
+    mobileFriendly?: boolean;
+    isSlowLoad?: boolean;
+    hasBrokenPages?: boolean;
+    auditedAt?: string | null;
 }
 
 const TABS: { key: keyof OutreachMessages; label: string }[] = [
@@ -35,6 +50,49 @@ export default function LeadCard({ lead }: { lead: Lead }) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+
+    const initialAudit: AuditResult | null = lead.auditedAt
+        ? {
+            websiteAgeYears: lead.websiteAgeYears ?? null,
+            isOldWebsite: Boolean(lead.isOldWebsite),
+            mobileFriendly: Boolean(lead.mobileFriendly),
+            isSlowLoad: Boolean(lead.isSlowLoad),
+            hasBrokenPages: Boolean(lead.hasBrokenPages),
+        }
+        : null;
+    const [audit, setAudit] = useState<AuditResult | null>(initialAudit);
+    const [isAuditing, setIsAuditing] = useState(false);
+    const [auditError, setAuditError] = useState('');
+
+    const runAudit = async (force = false) => {
+        setIsAuditing(true);
+        setAuditError('');
+        try {
+            const res = await fetch(`/api/proxy/leads/${lead.id}/audit${force ? '?force=true' : ''}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to audit website.');
+            setAudit(data);
+        } catch (err: any) {
+            setAuditError(err.message || 'Failed to audit website.');
+        } finally {
+            setIsAuditing(false);
+        }
+    };
+
+    const normalizeIndianPhone = (raw: string): string => {
+        const digits = raw.replace(/[^0-9]/g, '');
+        if (digits.startsWith('91') && digits.length === 12) return digits;
+        const local = digits.replace(/^0+/, '');
+        return `91${local}`;
+    };
+
+    const whatsappLink = lead.phone
+        ? `https://wa.me/${normalizeIndianPhone(lead.phone)}${messages ? `?text=${encodeURIComponent(messages.whatsappMessage)}` : ''}`
+        : null;
 
     const generate = async (force = false) => {
         setIsGenerating(true);
@@ -124,9 +182,60 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                                 {isGenerating ? 'Regenerating…' : 'Regenerate'}
                             </button>
                         </div>
+                        {whatsappLink && (
+                            <a
+                                className="mt-2 block w-full rounded-lg bg-emerald-500 px-3 py-1.5 text-center text-sm font-medium text-white transition hover:bg-emerald-600"
+                                href={whatsappLink}
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                💬 Send on WhatsApp
+                            </a>
+                        )}
                     </div>
                 )}
             </div>
+
+            {lead.website && (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                    {!audit && (
+                        <button
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={isAuditing}
+                            onClick={() => runAudit(false)}
+                        >
+                            {isAuditing ? 'Auditing website…' : '🔍 Audit website'}
+                        </button>
+                    )}
+                    {auditError && <p className="mt-2 text-xs text-red-600">{auditError}</p>}
+                    {audit && (
+                        <div>
+                            <div className="flex flex-wrap gap-1.5 text-xs">
+                                {audit.isOldWebsite && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                                        Website is {audit.websiteAgeYears ?? '5+'} yrs old
+                                    </span>
+                                )}
+                                {!audit.mobileFriendly && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">Not mobile-friendly</span>
+                                )}
+                                {audit.isSlowLoad && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">Slow load</span>
+                                )}
+                                {audit.hasBrokenPages && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">Broken links</span>
+                                )}
+                                {!audit.isOldWebsite && audit.mobileFriendly && !audit.isSlowLoad && !audit.hasBrokenPages && (
+                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">No issues found</span>
+                                )}
+                            </div>
+                            <button className="mt-2 text-xs font-medium text-slate-400 hover:text-slate-600" disabled={isAuditing} onClick={() => runAudit(true)}>
+                                {isAuditing ? 'Re-auditing…' : 'Re-audit'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
