@@ -17,7 +17,12 @@ export class AuditService {
 
     private async getWebsiteAge(website: string): Promise<{ ageYears: number | null; isOld: boolean }> {
         try {
-            const res = await fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(website)}`);
+            // Stripping the scheme matters: Wayback often only has old http:// snapshots
+            // and won't match an https:// query against them. timestamp=19960101 biases
+            // the "closest" match toward the earliest snapshot on record, since the API
+            // otherwise defaults to the snapshot closest to now.
+            const bareUrl = website.replace(/^https?:\/\//i, '');
+            const res = await fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(bareUrl)}&timestamp=19960101`);
             if (!res.ok) return { ageYears: null, isOld: false };
             const data: any = await res.json();
             const timestamp = data?.archived_snapshots?.closest?.timestamp ?? null;

@@ -81,6 +81,24 @@ describe('AuditService', () => {
         expect(result.websiteAgeYears).toBeNull();
     });
 
+    it('strips the scheme before querying Wayback, since it only reliably matches bare URLs', async () => {
+        let waybackUrl = '';
+        global.fetch = jest.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('archive.org')) {
+                waybackUrl = url;
+                return Promise.resolve({ ok: true, json: async () => ({}) });
+            }
+            if (opts?.method === 'HEAD') return Promise.resolve({ status: 200 });
+            return Promise.resolve({ ok: true, text: async () => '<html></html>' });
+        }) as any;
+
+        const service = new AuditService();
+        await service.auditWebsite('https://example.com/');
+
+        expect(waybackUrl).toContain(encodeURIComponent('example.com/'));
+        expect(waybackUrl).not.toContain(encodeURIComponent('https://'));
+    });
+
     it('uses PageSpeed score when PAGESPEED_API_KEY is configured', async () => {
         process.env.PAGESPEED_API_KEY = 'test-key';
         global.fetch = jest.fn().mockImplementation((url: string, opts?: any) => {
