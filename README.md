@@ -8,9 +8,7 @@
 
 **Find local businesses that need marketing help — before your competitors do.**
 
-Lead Radar searches a city + category (e.g. *"Ahmedabad" + "Dentist"*), pulls every matching business from Google Places, and scores each one on how weak its online presence is. No website and few reviews? That's a hot lead. Strong site, tons of reviews, active social? Skip it. Built for digital marketing, SEO, and web dev agencies who need a steady pipeline of Indian local-business prospects — not another expensive, US-focused tool like Apollo or ZoomInfo.
-
-Full product plan: [`Agency_Lead_Finder_Business_Plan.md`](Agency_Lead_Finder_Business_Plan.md).
+Lead Radar searches a city + category (e.g. *"Ahmedabad" + "Dentist"*), pulls every matching business from Google Places, scores each one on how weak its online presence is, and can write a cold email / LinkedIn message / WhatsApp message for it. No website and few reviews? That's a hot lead. Strong site, tons of reviews, active social? Skip it. Built for digital marketing, SEO, and web dev agencies who need a steady pipeline of Indian local-business prospects — not another expensive, US-focused tool like Apollo or ZoomInfo.
 
 ---
 
@@ -120,6 +118,9 @@ curl -X POST localhost:3001/leads/score \
 # Export as CSV
 curl "localhost:3001/leads/export?city=Ahmedabad&category=Dentist" \
   -H "x-api-key: $ADMIN_API_KEY" -o leads.csv
+
+# Generate outreach messages for a lead (cached; add ?force=true to regenerate)
+curl -X POST localhost:3001/leads/17/outreach -H "x-api-key: $ADMIN_API_KEY"
 ```
 
 From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/leads/*`.
@@ -147,6 +148,8 @@ On the frontend, `middleware.ts` enforces sign-in on `/search` and `/api/proxy/*
 | `ADMIN_API_KEY` | backend | Legacy auth bypass for scripts/CI |
 | `GOOGLE_PLACES_API_KEY` | backend | Lead collection source |
 | `REDIS_URL` | backend | Bull job queue |
+| `ANTHROPIC_API_KEY` | backend | AI outreach message generation |
+| `ANTHROPIC_MODEL` | backend | Optional override (default `claude-sonnet-5`) |
 | `BACKEND_URL` | frontend | Where `/api/proxy/*` forwards requests |
 
 See [`backend/.env.example`](backend/.env.example).
@@ -156,7 +159,7 @@ See [`backend/.env.example`](backend/.env.example).
 ## Tests
 
 ```bash
-cd backend && npm test        # scoring, CSV formatting, auth guard, Places API client
+cd backend && npm test        # scoring, CSV formatting, auth guard, Places API client, outreach generation
 cd frontend && npx tsc --noEmit   # typecheck
 ```
 
@@ -166,12 +169,10 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 
 ## Roadmap
 
-Tracked in full in the [business plan](Agency_Lead_Finder_Business_Plan.md#development-roadmap).
-
 - [x] **Week 1** — Landing page, auth, search UI, database
 - [x] **Week 2** — Data collection pipeline, lead database
 - [x] **Week 3** — Opportunity scoring, CSV export
-- [ ] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp), Stripe/Razorpay billing
+- [~] **Week 4** — AI outreach message generator ✅ (cold email / LinkedIn / WhatsApp via Claude), Stripe/Razorpay billing (pending)
 
 ---
 

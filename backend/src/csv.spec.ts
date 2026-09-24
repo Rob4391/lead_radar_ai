@@ -18,7 +18,7 @@ describe('leadToCsvRow', () => {
         });
 
         expect(row).toBe(
-            '"Joe\'s Pizza","555-1234","","a@example.com;b@example.com","https://a.com","","Austin","Restaurant","5","","","90"',
+            '"Joe\'s Pizza","555-1234","","a@example.com;b@example.com","https://a.com","","Austin","Restaurant","5","","","90","","",""',
         );
     });
 

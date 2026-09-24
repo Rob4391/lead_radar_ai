@@ -1,6 +1,7 @@
 export const LEAD_CSV_HEADER = [
     'name', 'phone', 'website', 'emails', 'urls', 'titles',
     'city', 'category', 'reviewCount', 'instagram', 'facebook', 'score',
+    'coldEmail', 'linkedinMessage', 'whatsappMessage',
 ];
 
 export interface CsvLead {
@@ -16,6 +17,9 @@ export interface CsvLead {
     instagram?: string | null;
     facebook?: string | null;
     score?: number | null;
+    coldEmail?: string | null;
+    linkedinMessage?: string | null;
+    whatsappMessage?: string | null;
 }
 
 function escapeCsvField(value: string): string {
@@ -36,6 +40,9 @@ export function leadToCsvRow(lead: CsvLead): string {
         lead.instagram || '',
         lead.facebook || '',
         lead.score ?? '',
+        lead.coldEmail || '',
+        lead.linkedinMessage || '',
+        lead.whatsappMessage || '',
     ];
     return fields.map(v => escapeCsvField(String(v))).join(',');
 }

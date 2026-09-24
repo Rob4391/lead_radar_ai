@@ -52,4 +52,15 @@ export class LeadsService implements OnModuleInit {
         }
         return updated;
     }
+
+    async findById(id: number) {
+        return this.prisma.lead.findUnique({ where: { id } });
+    }
+
+    async saveOutreach(id: number, messages: { coldEmail: string; linkedinMessage: string; whatsappMessage: string }) {
+        return this.prisma.lead.update({
+            where: { id },
+            data: { ...messages, outreachGeneratedAt: new Date() },
+        });
+    }
 }

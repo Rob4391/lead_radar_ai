@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Post, Body, Res, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Query, Post, Body, Res, UseGuards, Param, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Response } from 'express';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
@@ -6,6 +6,7 @@ import { ApiKeyGuard } from './api-key.guard';
 import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
 import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
+import { OutreachService } from './outreach/outreach.service';
 
 class CreateLeadDto {
     name?: string;
@@ -24,6 +25,7 @@ export class LeadsController {
     constructor(
         private readonly leadsService: LeadsService,
         private readonly placesService: PlacesService,
+        private readonly outreachService: OutreachService,
         @InjectQueue('lead-collection') private leadQueue: Queue,
     ) { }
 
@@ -97,6 +99,31 @@ export class LeadsController {
     async score(@Body() dto: { city?: string; category?: string }) {
         const updated = await this.leadsService.scoreLeads({ city: dto?.city, category: dto?.category });
         return { message: `Scored ${updated.length} lead(s)`, count: updated.length };
+    }
+
+    @Post(':id/outreach')
+    async generateOutreach(@Param('id') id: string, @Query('force') force?: string) {
+        const lead = await this.leadsService.findById(Number(id));
+        if (!lead) {
+            throw new NotFoundException(`Lead ${id} not found`);
+        }
+
+        if (!force && lead.coldEmail && lead.linkedinMessage && lead.whatsappMessage) {
+            return {
+                coldEmail: lead.coldEmail,
+                linkedinMessage: lead.linkedinMessage,
+                whatsappMessage: lead.whatsappMessage,
+                cached: true,
+            };
+        }
+
+        try {
+            const messages = await this.outreachService.generateMessages(lead);
+            await this.leadsService.saveOutreach(lead.id, messages);
+            return { ...messages, cached: false };
+        } catch (err) {
+            throw new InternalServerErrorException((err as Error).message);
+        }
     }
 
     @Get('export')
