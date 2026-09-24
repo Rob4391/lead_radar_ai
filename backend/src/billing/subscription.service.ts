@@ -9,18 +9,20 @@ export class SubscriptionService {
     /** New users get the FREE tier immediately, no payment required. */
     private async getOrCreate(userId: string) {
         const existing = await this.prisma.subscription.findUnique({ where: { userId } });
-        if (existing) return existing;
-
         const now = new Date();
         const periodEnd = new Date(now.getTime() + BILLING_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+        // Self-heal a blank row from before FREE plans existed (never had a plan set).
+        if (existing && existing.plan === null) {
+            return this.prisma.subscription.update({
+                where: { userId },
+                data: { plan: 'FREE', status: 'ACTIVE', periodStart: now, currentPeriodEnd: periodEnd, searchesThisPeriod: 0 },
+            });
+        }
+        if (existing) return existing;
+
         return this.prisma.subscription.create({
-            data: {
-                userId,
-                plan: 'FREE',
-                status: 'ACTIVE',
-                periodStart: now,
-                currentPeriodEnd: periodEnd,
-            },
+            data: { userId, plan: 'FREE', status: 'ACTIVE', periodStart: now, currentPeriodEnd: periodEnd },
         });
     }
 

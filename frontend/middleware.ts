@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-// Search results and the backend proxy expose lead data and require a signed-in user.
-const isProtectedRoute = createRouteMatcher(['/search(.*)', '/api/proxy(.*)']);
+// Search results, pricing, and the backend proxy expose lead/billing data and require a signed-in user.
+const isProtectedRoute = createRouteMatcher(['/search(.*)', '/pricing(.*)', '/api/proxy(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
     if (isProtectedRoute(req)) {

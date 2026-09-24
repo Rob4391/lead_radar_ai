@@ -35,7 +35,14 @@ export default function Pricing() {
 
     useEffect(() => {
         fetch('/api/proxy/billing/plans').then(r => r.json()).then(setPlans).catch(() => setError('Could not load plans.'));
-        fetch('/api/proxy/billing/status').then(r => (r.ok ? r.json() : null)).then(setStatus).catch(() => { });
+        fetch('/api/proxy/billing/status')
+            .then(async r => {
+                const data = await r.json();
+                if (!r.ok) throw new Error(`status ${r.status}: ${data.message || data.error || JSON.stringify(data)}`);
+                return data;
+            })
+            .then(setStatus)
+            .catch((err: Error) => setError(`Could not load your plan status — ${err.message}`));
     }, []);
 
     const subscribe = async (plan: string) => {

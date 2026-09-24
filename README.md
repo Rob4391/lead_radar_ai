@@ -172,8 +172,9 @@ This is intentionally *not* Razorpay's native recurring Subscriptions API — ea
 | `ADMIN_API_KEY` | backend | Legacy auth bypass for scripts/CI |
 | `GOOGLE_PLACES_API_KEY` | backend | Lead collection source |
 | `REDIS_URL` | backend | Bull job queue |
-| `ANTHROPIC_API_KEY` | backend | AI outreach message generation |
-| `ANTHROPIC_MODEL` | backend | Optional override (default `claude-sonnet-5`) |
+| `LLM_PROVIDER` | backend | `ollama` (default, free/local) or `anthropic` |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | backend | Ollama endpoint (default `localhost:11434`) / model (default `qwen2.5:1.5b`) |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | backend | Only used when `LLM_PROVIDER=anthropic` (paid API, default `claude-sonnet-5`) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | backend | Billing checkout (free test-mode keys) |
 | `RAZORPAY_WEBHOOK_SECRET` | backend | Verifies `POST /billing/webhook` signatures |
 | `BACKEND_URL` | frontend | Where `/api/proxy/*` forwards requests |
@@ -198,7 +199,7 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 1** — Landing page, auth, search UI, database
 - [x] **Week 2** — Data collection pipeline, lead database
 - [x] **Week 3** — Opportunity scoring, CSV export
-- [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp via Claude), Razorpay billing with monthly search limits
+- [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp, free via local Ollama or Claude), Razorpay billing with monthly search limits
 
 ---
 

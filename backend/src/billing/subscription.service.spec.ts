@@ -57,6 +57,25 @@ describe('SubscriptionService', () => {
         expect(await service.canSearch('user_1')).toBe(true);
     });
 
+    it('heals a legacy blank row (plan: null, status: EXPIRED) into an active FREE plan', async () => {
+        store['user_legacy'] = {
+            id: nextId++,
+            userId: 'user_legacy',
+            plan: null,
+            status: 'EXPIRED',
+            periodStart: null,
+            currentPeriodEnd: null,
+            searchesThisPeriod: 0,
+            lastRazorpayOrderId: null,
+        };
+
+        const status = await service.getStatus('user_legacy');
+        expect(status.plan).toBe('FREE');
+        expect(status.status).toBe('ACTIVE');
+        expect(status.searchLimit).toBe(10);
+        expect(await service.canSearch('user_legacy')).toBe(true);
+    });
+
     it('blocks searches once the FREE limit is reached', async () => {
         await service.getStatus('user_free'); // provisions the FREE plan
         store['user_free'].searchesThisPeriod = 10;
