@@ -72,6 +72,13 @@ export class LeadsService implements OnModuleInit {
         });
     }
 
+    async saveProposal(id: number, proposal: string) {
+        return this.prisma.lead.update({
+            where: { id },
+            data: { proposal, proposalGeneratedAt: new Date() },
+        });
+    }
+
     async findCompetitors(id: number, limit = 3) {
         const lead = await this.findById(id);
         if (!lead) return null;
