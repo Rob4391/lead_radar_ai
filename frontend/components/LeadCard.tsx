@@ -14,6 +14,15 @@ interface AuditResult {
     hasBrokenPages: boolean;
 }
 
+interface Competitor {
+    id: number;
+    name?: string | null;
+    website?: string | null;
+    reviewCount?: number | null;
+    instagram?: string | null;
+    facebook?: string | null;
+}
+
 interface Lead {
     id: number;
     name?: string;
@@ -88,6 +97,25 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         if (digits.startsWith('91') && digits.length === 12) return digits;
         const local = digits.replace(/^0+/, '');
         return `91${local}`;
+    };
+
+    const [competitors, setCompetitors] = useState<Competitor[] | null>(null);
+    const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
+    const [competitorsError, setCompetitorsError] = useState('');
+
+    const loadCompetitors = async () => {
+        setIsLoadingCompetitors(true);
+        setCompetitorsError('');
+        try {
+            const res = await fetch(`/api/proxy/leads/${lead.id}/competitors`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to load competitors.');
+            setCompetitors(data);
+        } catch (err: any) {
+            setCompetitorsError(err.message || 'Failed to load competitors.');
+        } finally {
+            setIsLoadingCompetitors(false);
+        }
     };
 
     const whatsappLink = lead.phone
@@ -236,6 +264,38 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                     )}
                 </div>
             )}
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+                {competitors === null && (
+                    <button
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isLoadingCompetitors}
+                        onClick={loadCompetitors}
+                    >
+                        {isLoadingCompetitors ? 'Finding competitors…' : '📊 Compare to competitors'}
+                    </button>
+                )}
+                {competitorsError && <p className="mt-2 text-xs text-red-600">{competitorsError}</p>}
+                {competitors && competitors.length === 0 && (
+                    <p className="text-xs text-slate-400">No comparable competitors found in this search.</p>
+                )}
+                {competitors && competitors.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Top local competitors</p>
+                        {competitors.map(c => (
+                            <div key={c.id} className="rounded-lg bg-slate-50 p-2 text-xs">
+                                <div className="font-semibold text-slate-800">{c.name}</div>
+                                <div className="mt-1 flex flex-wrap gap-1.5 text-slate-500">
+                                    <span>{c.reviewCount ?? 0} reviews</span>
+                                    {c.website && <span>· has a website</span>}
+                                    {c.instagram && <span>· on Instagram</span>}
+                                    {c.facebook && <span>· on Facebook</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
