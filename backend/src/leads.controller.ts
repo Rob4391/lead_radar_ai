@@ -9,6 +9,7 @@ import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
 import { OutreachService } from './outreach/outreach.service';
 import { SubscriptionService } from './billing/subscription.service';
 import { AuditService } from './audit/audit.service';
+import { ProposalService } from './proposal/proposal.service';
 
 class CreateLeadDto {
     name?: string;
@@ -30,6 +31,7 @@ export class LeadsController {
         private readonly outreachService: OutreachService,
         private readonly subscriptionService: SubscriptionService,
         private readonly auditService: AuditService,
+        private readonly proposalService: ProposalService,
         @InjectQueue('lead-collection') private leadQueue: Queue,
     ) { }
 
@@ -168,6 +170,26 @@ export class LeadsController {
             const audit = await this.auditService.auditWebsite(lead.website);
             await this.leadsService.saveAudit(lead.id, audit);
             return { ...audit, cached: false };
+        } catch (err) {
+            throw new InternalServerErrorException((err as Error).message);
+        }
+    }
+
+    @Post(':id/proposal')
+    async generateProposal(@Param('id') id: string, @Query('force') force?: string) {
+        const lead = await this.leadsService.findById(Number(id));
+        if (!lead) {
+            throw new NotFoundException(`Lead ${id} not found`);
+        }
+
+        if (!force && lead.proposal) {
+            return { proposal: lead.proposal, cached: true };
+        }
+
+        try {
+            const result = await this.proposalService.generateProposal(lead);
+            await this.leadsService.saveProposal(lead.id, result.proposal);
+            return { ...result, cached: false };
         } catch (err) {
             throw new InternalServerErrorException((err as Error).message);
         }

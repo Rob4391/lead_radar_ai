@@ -36,6 +36,9 @@ model Lead {
   isSlowLoad      Boolean?
   hasBrokenPages  Boolean?
   auditedAt       DateTime?
+
+  proposal            String?
+  proposalGeneratedAt DateTime?
 }
 
 enum Plan {

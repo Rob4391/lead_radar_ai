@@ -40,6 +40,8 @@ interface Lead {
     isSlowLoad?: boolean;
     hasBrokenPages?: boolean;
     auditedAt?: string | null;
+    proposal?: string | null;
+    proposalGeneratedAt?: string | null;
 }
 
 const TABS: { key: keyof OutreachMessages; label: string }[] = [
@@ -89,6 +91,41 @@ export default function LeadCard({ lead }: { lead: Lead }) {
             setAuditError(err.message || 'Failed to audit website.');
         } finally {
             setIsAuditing(false);
+        }
+    };
+
+    const [proposal, setProposal] = useState<string | null>(lead.proposal ?? null);
+    const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
+    const [proposalError, setProposalError] = useState('');
+    const [proposalCopied, setProposalCopied] = useState(false);
+
+    const generateProposal = async (force = false) => {
+        setIsGeneratingProposal(true);
+        setProposalError('');
+        try {
+            const res = await fetch(`/api/proxy/leads/${lead.id}/proposal${force ? '?force=true' : ''}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to generate proposal.');
+            setProposal(data.proposal);
+        } catch (err: any) {
+            setProposalError(err.message || 'Failed to generate proposal.');
+        } finally {
+            setIsGeneratingProposal(false);
+        }
+    };
+
+    const copyProposal = async () => {
+        if (!proposal) return;
+        try {
+            await navigator.clipboard.writeText(proposal);
+            setProposalCopied(true);
+            setTimeout(() => setProposalCopied(false), 1500);
+        } catch {
+            // clipboard API unavailable; silently ignore
         }
     };
 
@@ -264,6 +301,34 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                     )}
                 </div>
             )}
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+                {!proposal && (
+                    <button
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isGeneratingProposal}
+                        onClick={() => generateProposal(false)}
+                    >
+                        {isGeneratingProposal ? 'Writing proposal…' : '📄 Generate proposal'}
+                    </button>
+                )}
+                {proposalError && <p className="mt-2 text-xs text-red-600">{proposalError}</p>}
+                {proposal && (
+                    <div>
+                        <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
+                            {proposal}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between">
+                            <button className="text-xs font-medium text-brand-700 hover:underline" onClick={copyProposal}>
+                                {proposalCopied ? 'Copied!' : 'Copy'}
+                            </button>
+                            <button className="text-xs font-medium text-slate-400 hover:text-slate-600" disabled={isGeneratingProposal} onClick={() => generateProposal(true)}>
+                                {isGeneratingProposal ? 'Regenerating…' : 'Regenerate'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <div className="mt-3 border-t border-slate-100 pt-3">
                 {competitors === null && (
