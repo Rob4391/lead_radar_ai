@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { computeOpportunityScore } from './scoring';
+import { rankCompetitors } from './competitors';
 
 @Injectable()
 export class LeadsService implements OnModuleInit {
@@ -69,5 +70,15 @@ export class LeadsService implements OnModuleInit {
             where: { id },
             data: { ...audit, auditedAt: new Date() },
         });
+    }
+
+    async findCompetitors(id: number, limit = 3) {
+        const lead = await this.findById(id);
+        if (!lead) return null;
+
+        const candidates = await this.prisma.lead.findMany({
+            where: { city: lead.city, category: lead.category },
+        });
+        return rankCompetitors(candidates, id, limit);
     }
 }

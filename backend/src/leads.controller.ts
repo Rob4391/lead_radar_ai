@@ -173,6 +173,15 @@ export class LeadsController {
         }
     }
 
+    @Get(':id/competitors')
+    async getCompetitors(@Param('id') id: string) {
+        const competitors = await this.leadsService.findCompetitors(Number(id));
+        if (competitors === null) {
+            throw new NotFoundException(`Lead ${id} not found`);
+        }
+        return competitors;
+    }
+
     @Get('export')
     async export(@Res() res: Response, @Query('city') city?: string, @Query('category') category?: string) {
         const leads = await this.leadsService.findAll({ city, category });
