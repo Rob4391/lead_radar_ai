@@ -1,0 +1,4 @@
+# Normalize line endings to LF in the repo regardless of the checkout
+# platform's core.autocrlf setting, so files stop showing as perpetually
+# "modified" from CRLF/LF churn on Windows.
+* text=auto eol=lf

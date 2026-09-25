@@ -26,3 +26,7 @@ frontend/.next/
 # Local env files
 backend/.env
 frontend/.env
+
+# Next.js auto-generates this on every dev/build run; committing it
+# just churns depending on which mode last ran.
+frontend/next-env.d.ts
