@@ -1,12 +1,18 @@
-# Lead Radar AI
+<div align="center">
+  <img src="docs/logo.svg" width="120" height="120" alt="Lead Radar AI logo" />
 
-[![CI](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml/badge.svg)](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-20.x-339933?logo=node.js&logoColor=white)](backend/package.json)
-[![Next.js](https://img.shields.io/badge/frontend-Next.js%2016-black?logo=next.js)](frontend/package.json)
-[![NestJS](https://img.shields.io/badge/backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](backend/package.json)
+  # Lead Radar AI
 
-**Find local businesses that need marketing help — before your competitors do.**
+  **Find local businesses that need marketing help — before your competitors do.**
+
+  [![CI](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml/badge.svg)](https://github.com/Rob4391/lead_radar_ai/actions/workflows/ci-prisma-backend.yml)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![Node](https://img.shields.io/badge/node-20.x-339933?logo=node.js&logoColor=white)](backend/package.json)
+  [![Next.js](https://img.shields.io/badge/frontend-Next.js%2016-black?logo=next.js)](frontend/package.json)
+  [![NestJS](https://img.shields.io/badge/backend-NestJS%2010-E0234E?logo=nestjs&logoColor=white)](backend/package.json)
+</div>
+
+---
 
 Lead Radar searches a city + category (e.g. *"Ahmedabad" + "Dentist"*), pulls every matching business from Google Places, scores each one on how weak its online presence is, and can write a cold email / LinkedIn message / WhatsApp message for it. No website and few reviews? That's a hot lead. Strong site, tons of reviews, active social? Skip it. Built for digital marketing, SEO, and web dev agencies who need a steady pipeline of Indian local-business prospects — not another expensive, US-focused tool like Apollo or ZoomInfo.
 
