@@ -39,6 +39,18 @@ model Lead {
 
   proposal            String?
   proposalGeneratedAt DateTime?
+
+  status    LeadStatus @default(NEW)
+  notes     String?
+  statusUpdatedAt DateTime?
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  WON
+  LOST
 }
 
 enum Plan {

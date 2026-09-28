@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildOutreachPrompt, parseOutreachResponse, OutreachLead, OutreachMessages } from './prompt';
+import { buildOutreachPrompt, parseOutreachResponse, OutreachLead, OutreachMessages, OutreachLanguage } from './prompt';
 
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-5';
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -69,8 +69,8 @@ export class OutreachService {
         return data.response;
     }
 
-    async generateMessages(lead: OutreachLead): Promise<OutreachMessages> {
-        const prompt = buildOutreachPrompt(lead);
+    async generateMessages(lead: OutreachLead, language: OutreachLanguage = 'english'): Promise<OutreachMessages> {
+        const prompt = buildOutreachPrompt(lead, language);
         const text = this.getProvider() === 'anthropic' ? await this.callAnthropic(prompt) : await this.callOllama(prompt);
 
         try {

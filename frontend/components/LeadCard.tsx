@@ -42,7 +42,19 @@ interface Lead {
     auditedAt?: string | null;
     proposal?: string | null;
     proposalGeneratedAt?: string | null;
+    status?: LeadStatus;
+    notes?: string | null;
 }
+
+type LeadStatus = 'NEW' | 'CONTACTED' | 'REPLIED' | 'WON' | 'LOST';
+
+const STATUS_STYLES: Record<LeadStatus, string> = {
+    NEW: 'bg-slate-100 text-slate-600',
+    CONTACTED: 'bg-blue-100 text-blue-700',
+    REPLIED: 'bg-amber-100 text-amber-700',
+    WON: 'bg-emerald-100 text-emerald-700',
+    LOST: 'bg-red-100 text-red-700',
+};
 
 const TABS: { key: keyof OutreachMessages; label: string }[] = [
     { key: 'coldEmail', label: 'Email' },
@@ -61,6 +73,31 @@ export default function LeadCard({ lead }: { lead: Lead }) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+    const [language, setLanguage] = useState('english');
+
+    const [status, setStatus] = useState<LeadStatus>(lead.status ?? 'NEW');
+    const [notes, setNotes] = useState(lead.notes ?? '');
+    const [isSavingStatus, setIsSavingStatus] = useState(false);
+    const [statusError, setStatusError] = useState('');
+
+    const saveStatus = async (newStatus: LeadStatus, newNotes: string) => {
+        setIsSavingStatus(true);
+        setStatusError('');
+        try {
+            const res = await fetch(`/api/proxy/leads/${lead.id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus, notes: newNotes }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to update status.');
+            setStatus(newStatus);
+        } catch (err: any) {
+            setStatusError(err.message || 'Failed to update status.');
+        } finally {
+            setIsSavingStatus(false);
+        }
+    };
 
     const initialAudit: AuditResult | null = lead.auditedAt
         ? {
@@ -163,7 +200,11 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         setIsGenerating(true);
         setError('');
         try {
-            const res = await fetch(`/api/proxy/leads/${lead.id}/outreach${force ? '?force=true' : ''}`, {
+            const params = new URLSearchParams();
+            if (force) params.set('force', 'true');
+            if (language !== 'english') params.set('language', language);
+            const query = params.toString();
+            const res = await fetch(`/api/proxy/leads/${lead.id}/outreach${query ? `?${query}` : ''}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -193,7 +234,10 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         <div className="rounded-xl border border-slate-100 bg-gradient-to-b from-white to-brand-50/40 p-4 shadow-sm transition hover:shadow-md">
             <div className="flex items-start justify-between gap-2">
                 <strong className="text-slate-900">{lead.name}</strong>
-                <span className="badge">{lead.city}</span>
+                <div className="flex items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[status]}`}>{status}</span>
+                    <span className="badge">{lead.city}</span>
+                </div>
             </div>
             <div className="mt-1 text-sm text-slate-500">{lead.category}</div>
             {typeof lead.score === 'number' && (
@@ -211,6 +255,18 @@ export default function LeadCard({ lead }: { lead: Lead }) {
             )}
 
             <div className="mt-3 border-t border-slate-100 pt-3">
+                <select
+                    className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    disabled={isGenerating}
+                >
+                    <option value="english">English</option>
+                    <option value="hindi">Hindi</option>
+                    <option value="gujarati">Gujarati</option>
+                    <option value="tamil">Tamil</option>
+                    <option value="marathi">Marathi</option>
+                </select>
                 {!messages && (
                     <button
                         className="w-full rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -360,6 +416,32 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                         ))}
                     </div>
                 )}
+            </div>
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</p>
+                <select
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
+                    value={status}
+                    disabled={isSavingStatus}
+                    onChange={(e) => saveStatus(e.target.value as LeadStatus, notes)}
+                >
+                    <option value="NEW">New</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="REPLIED">Replied</option>
+                    <option value="WON">Won</option>
+                    <option value="LOST">Lost</option>
+                </select>
+                <textarea
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                    placeholder="Notes…"
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    onBlur={() => saveStatus(status, notes)}
+                    disabled={isSavingStatus}
+                />
+                {statusError && <p className="mt-1 text-xs text-red-600">{statusError}</p>}
             </div>
         </div>
     );

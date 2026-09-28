@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Post, Body, Res, Req, UseGuards, Param, NotFoundException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Query, Post, Patch, Body, Res, Req, UseGuards, Param, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
@@ -7,9 +7,11 @@ import { LeadsService } from './leads.service';
 import { PlacesService } from './places/places.service';
 import { LEAD_CSV_HEADER, leadToCsvRow } from './csv';
 import { OutreachService } from './outreach/outreach.service';
+import { isOutreachLanguage } from './outreach/prompt';
 import { SubscriptionService } from './billing/subscription.service';
 import { AuditService } from './audit/audit.service';
 import { ProposalService } from './proposal/proposal.service';
+import { isLeadStatus } from './lead-status';
 
 class CreateLeadDto {
     name?: string;
@@ -121,13 +123,21 @@ export class LeadsController {
     }
 
     @Post(':id/outreach')
-    async generateOutreach(@Param('id') id: string, @Query('force') force?: string) {
+    async generateOutreach(@Param('id') id: string, @Query('force') force?: string, @Query('language') language?: string) {
         const lead = await this.leadsService.findById(Number(id));
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
 
-        if (!force && lead.coldEmail && lead.linkedinMessage && lead.whatsappMessage) {
+        if (language && !isOutreachLanguage(language)) {
+            throw new BadRequestException(`Unsupported language: ${language}`);
+        }
+        // A non-default language always regenerates - the cache only ever holds
+        // one language's worth of messages at a time, so a language switch is
+        // itself a reason to regenerate, same as ?force=true.
+        const isDefaultLanguage = !language || language === 'english';
+
+        if (!force && isDefaultLanguage && lead.coldEmail && lead.linkedinMessage && lead.whatsappMessage) {
             return {
                 coldEmail: lead.coldEmail,
                 linkedinMessage: lead.linkedinMessage,
@@ -137,7 +147,7 @@ export class LeadsController {
         }
 
         try {
-            const messages = await this.outreachService.generateMessages(lead);
+            const messages = await this.outreachService.generateMessages(lead, isOutreachLanguage(language) ? language : 'english');
             await this.leadsService.saveOutreach(lead.id, messages);
             return { ...messages, cached: false };
         } catch (err) {
@@ -193,6 +203,18 @@ export class LeadsController {
         } catch (err) {
             throw new InternalServerErrorException((err as Error).message);
         }
+    }
+
+    @Patch(':id/status')
+    async updateStatus(@Param('id') id: string, @Body() dto: { status?: string; notes?: string }) {
+        const lead = await this.leadsService.findById(Number(id));
+        if (!lead) {
+            throw new NotFoundException(`Lead ${id} not found`);
+        }
+        if (!isLeadStatus(dto.status)) {
+            throw new BadRequestException(`Unsupported status: ${dto.status}`);
+        }
+        return this.leadsService.updateStatus(lead.id, dto.status, dto.notes);
     }
 
     @Get(':id/competitors')

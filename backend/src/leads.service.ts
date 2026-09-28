@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { computeOpportunityScore } from './scoring';
 import { rankCompetitors } from './competitors';
+import { LeadStatus } from './lead-status';
 
 @Injectable()
 export class LeadsService implements OnModuleInit {
@@ -76,6 +77,17 @@ export class LeadsService implements OnModuleInit {
         return this.prisma.lead.update({
             where: { id },
             data: { proposal, proposalGeneratedAt: new Date() },
+        });
+    }
+
+    async updateStatus(id: number, status: LeadStatus, notes?: string) {
+        return this.prisma.lead.update({
+            where: { id },
+            data: {
+                status,
+                ...(notes !== undefined ? { notes } : {}),
+                statusUpdatedAt: new Date(),
+            },
         });
     }
 
