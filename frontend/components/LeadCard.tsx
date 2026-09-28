@@ -62,6 +62,21 @@ const TABS: { key: keyof OutreachMessages; label: string }[] = [
     { key: 'whatsappMessage', label: 'WhatsApp' },
 ];
 
+// Each lead action lives in its own collapsed-by-default section so a card
+// with all five features generated doesn't turn into a wall of text - the
+// summary row alone tells you what's available before you open anything.
+function Section({ title, icon, defaultOpen, children }: { title: string; icon: string; defaultOpen?: boolean; children: React.ReactNode }) {
+    return (
+        <details className="group mt-3 border-t border-slate-100 pt-3" open={defaultOpen}>
+            <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-700 marker:content-none">
+                <span>{icon} {title}</span>
+                <span className="text-slate-400 transition-transform group-open:rotate-180">⌄</span>
+            </summary>
+            <div className="mt-2">{children}</div>
+        </details>
+    );
+}
+
 export default function LeadCard({ lead }: { lead: Lead }) {
     const initial: OutreachMessages | null =
         lead.coldEmail && lead.linkedinMessage && lead.whatsappMessage
@@ -290,7 +305,7 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                 </a>
             )}
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <Section title="Outreach" icon="✨" defaultOpen>
                 <select
                     className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
                     value={language}
@@ -351,17 +366,17 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                         )}
                     </div>
                 )}
-            </div>
+            </Section>
 
             {lead.website && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
+                <Section title="Website audit" icon="🔍">
                     {!audit && (
                         <button
                             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                             disabled={isAuditing}
                             onClick={() => runAudit(false)}
                         >
-                            {isAuditing ? 'Auditing website…' : '🔍 Audit website'}
+                            {isAuditing ? 'Auditing website…' : 'Run audit'}
                         </button>
                     )}
                     {auditError && <p className="mt-2 text-xs text-red-600">{auditError}</p>}
@@ -391,17 +406,17 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                             </button>
                         </div>
                     )}
-                </div>
+                </Section>
             )}
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <Section title="Proposal" icon="📄">
                 {!proposal && (
                     <button
                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={isGeneratingProposal}
                         onClick={() => generateProposal(false)}
                     >
-                        {isGeneratingProposal ? 'Writing proposal…' : '📄 Generate proposal'}
+                        {isGeneratingProposal ? 'Writing proposal…' : 'Generate proposal'}
                     </button>
                 )}
                 {proposalError && <p className="mt-2 text-xs text-red-600">{proposalError}</p>}
@@ -420,16 +435,16 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                         </div>
                     </div>
                 )}
-            </div>
+            </Section>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <Section title="Competitors" icon="📊">
                 {competitors === null && (
                     <button
                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={isLoadingCompetitors}
                         onClick={loadCompetitors}
                     >
-                        {isLoadingCompetitors ? 'Finding competitors…' : '📊 Compare to competitors'}
+                        {isLoadingCompetitors ? 'Finding competitors…' : 'Compare to competitors'}
                     </button>
                 )}
                 {competitorsError && <p className="mt-2 text-xs text-red-600">{competitorsError}</p>}
@@ -452,10 +467,9 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                         ))}
                     </div>
                 )}
-            </div>
+            </Section>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</p>
+            <Section title="Status & notes" icon="🏷️">
                 <select
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700"
                     value={status}
@@ -478,15 +492,15 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                     disabled={isSavingStatus}
                 />
                 {statusError && <p className="mt-1 text-xs text-red-600">{statusError}</p>}
-            </div>
+            </Section>
 
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <Section title="Add to list" icon="📋">
                 {lists === null && (
                     <button
                         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                         onClick={loadLists}
                     >
-                        📋 Add to list
+                        Load my lists
                     </button>
                 )}
                 {lists !== null && lists.length === 0 && (
@@ -515,7 +529,7 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                         </button>
                     </div>
                 )}
-            </div>
+            </Section>
         </div>
     );
 }
