@@ -43,6 +43,30 @@ model Lead {
   status    LeadStatus @default(NEW)
   notes     String?
   statusUpdatedAt DateTime?
+
+  listItems ListLead[]
+}
+
+model List {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  items ListLead[]
+
+  @@unique([userId, name])
+}
+
+model ListLead {
+  listId  Int
+  leadId  Int
+  addedAt DateTime @default(now())
+
+  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@id([listId, leadId])
 }
 
 enum LeadStatus {

@@ -121,8 +121,11 @@ export default function Search() {
                         <p className="font-bold leading-tight text-slate-900">Lead Radar</p>
                         <p className="text-sm text-slate-500">Search results</p>
                     </div>
+                    <Link href="/lists" className="ml-auto text-xs font-medium text-slate-400 hover:text-brand-700">
+                        📋 My Lists
+                    </Link>
                     {usage && (
-                        <Link href="/pricing" className="ml-auto text-xs font-medium text-slate-400 hover:text-brand-700">
+                        <Link href="/pricing" className="text-xs font-medium text-slate-400 hover:text-brand-700">
                             {usage.searchLimit === null ? 'Unlimited searches' : `${usage.remaining ?? 0}/${usage.searchLimit} searches left`}
                         </Link>
                     )}

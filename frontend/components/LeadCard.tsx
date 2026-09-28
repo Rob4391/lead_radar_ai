@@ -99,6 +99,42 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         }
     };
 
+    const [lists, setLists] = useState<{ id: number; name: string }[] | null>(null);
+    const [selectedListId, setSelectedListId] = useState('');
+    const [isAddingToList, setIsAddingToList] = useState(false);
+    const [listMessage, setListMessage] = useState('');
+
+    const loadLists = async () => {
+        try {
+            const res = await fetch('/api/proxy/lists');
+            const data = await res.json();
+            if (res.ok) setLists(data);
+        } catch {
+            // silently ignore; the "Add to list" control just won't populate
+        }
+    };
+
+    const addToList = async () => {
+        if (!selectedListId) return;
+        setIsAddingToList(true);
+        setListMessage('');
+        try {
+            const res = await fetch(`/api/proxy/lists/${selectedListId}/leads`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leadId: lead.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to add to list.');
+            setListMessage('Added!');
+            setTimeout(() => setListMessage(''), 1500);
+        } catch (err: any) {
+            setListMessage(err.message || 'Failed to add to list.');
+        } finally {
+            setIsAddingToList(false);
+        }
+    };
+
     const initialAudit: AuditResult | null = lead.auditedAt
         ? {
             websiteAgeYears: lead.websiteAgeYears ?? null,
@@ -442,6 +478,43 @@ export default function LeadCard({ lead }: { lead: Lead }) {
                     disabled={isSavingStatus}
                 />
                 {statusError && <p className="mt-1 text-xs text-red-600">{statusError}</p>}
+            </div>
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+                {lists === null && (
+                    <button
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                        onClick={loadLists}
+                    >
+                        📋 Add to list
+                    </button>
+                )}
+                {lists !== null && lists.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                        No lists yet — create one from the <a href="/lists" className="text-brand-700 hover:underline">Lists page</a>.
+                    </p>
+                )}
+                {lists !== null && lists.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        <select
+                            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            value={selectedListId}
+                            onChange={(e) => setSelectedListId(e.target.value)}
+                        >
+                            <option value="">Choose a list…</option>
+                            {lists.map(l => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={!selectedListId || isAddingToList}
+                            onClick={addToList}
+                        >
+                            {isAddingToList ? '…' : listMessage || 'Add'}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
