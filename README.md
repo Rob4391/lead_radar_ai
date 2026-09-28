@@ -140,7 +140,8 @@ curl -X POST localhost:3001/leads/score \
 curl "localhost:3001/leads/export?city=Ahmedabad&category=Dentist" \
   -H "x-api-key: $ADMIN_API_KEY" -o leads.csv
 
-# Generate outreach messages for a lead (cached; add ?force=true to regenerate)
+# Generate outreach messages for a lead (cached; add ?force=true to regenerate,
+# or ?language=hindi|gujarati|tamil|marathi to generate in another language)
 curl -X POST localhost:3001/leads/17/outreach -H "x-api-key: $ADMIN_API_KEY"
 
 # Audit a lead's website (cached; add ?force=true to re-audit)
@@ -151,6 +152,10 @@ curl -X POST localhost:3001/leads/17/proposal -H "x-api-key: $ADMIN_API_KEY"
 
 # Get a lead's top 2-3 local competitors, ranked by strongest online presence
 curl localhost:3001/leads/17/competitors -H "x-api-key: $ADMIN_API_KEY"
+
+# Update a lead's pipeline status (NEW/CONTACTED/REPLIED/WON/LOST) and notes
+curl -X PATCH localhost:3001/leads/17/status -H "x-api-key: $ADMIN_API_KEY" \
+  -H "content-type: application/json" -d '{"status": "CONTACTED", "notes": "Left voicemail"}'
 
 # List pricing tiers (public, no auth)
 curl localhost:3001/billing/plans
@@ -233,6 +238,7 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp, free via local Ollama or Claude), Razorpay billing with monthly search limits
 - [x] **Week 5** — Online Presence Audit (website age, mobile-friendliness, broken links), WhatsApp click-to-chat deep-link
 - [x] **Week 6** — Competitor benchmarking (top 2-3 local competitors per lead), Proposal Generator (AI scope + pricing proposal, built on Week 5's audit findings)
+- [ ] **Week 7 (in progress)** — Multi-language outreach ✅, Lead status tracking ✅, Lead Lists (save searches into named lists), UI polish pass
 
 ---
 
