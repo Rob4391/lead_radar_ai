@@ -16,9 +16,16 @@ interface ListDetail {
     leads: any[];
 }
 
+// List ids are numeric-only; reject anything else before it ever reaches a
+// fetch URL, since `id` otherwise comes straight from the (user-controlled)
+// query string.
+function asListId(value: unknown): string | null {
+    return typeof value === 'string' && /^\d+$/.test(value) ? value : null;
+}
+
 export default function Lists() {
     const router = useRouter();
-    const { id } = router.query;
+    const id = asListId(router.query.id);
 
     const [lists, setLists] = useState<ListSummary[]>([]);
     const [detail, setDetail] = useState<ListDetail | null>(null);
@@ -55,7 +62,7 @@ export default function Lists() {
     };
 
     useEffect(() => {
-        if (typeof id === 'string') {
+        if (id !== null) {
             loadDetail(id);
         } else {
             setDetail(null);
@@ -92,7 +99,7 @@ export default function Lists() {
     };
 
     const removeLeadFromList = async (leadId: number) => {
-        if (typeof id !== 'string') return;
+        if (id === null) return;
         try {
             await fetch(`/api/proxy/lists/${id}/leads/${leadId}`, { method: 'DELETE' });
             loadDetail(id);
