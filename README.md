@@ -161,7 +161,18 @@ curl -X PATCH localhost:3001/leads/17/status -H "x-api-key: $ADMIN_API_KEY" \
 curl localhost:3001/billing/plans
 ```
 
-From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/leads/*`.
+`/lists` is per-user data, so unlike the routes above it has **no** `x-api-key` admin bypass — every request needs a real Clerk-authenticated user:
+
+```bash
+# Requires a real Clerk Bearer token, not x-api-key (see Auth model)
+curl -X POST localhost:3001/lists -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" -d '{"name": "Q4 Hot Leads"}'
+curl localhost:3001/lists -H "Authorization: Bearer $TOKEN"
+curl -X POST localhost:3001/lists/1/leads -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" -d '{"leadId": 17}'
+```
+
+From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/leads/*` and `/api/proxy/lists/*`.
 
 ---
 
@@ -238,7 +249,7 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 4** — AI outreach message generator (cold email / LinkedIn / WhatsApp, free via local Ollama or Claude), Razorpay billing with monthly search limits
 - [x] **Week 5** — Online Presence Audit (website age, mobile-friendliness, broken links), WhatsApp click-to-chat deep-link
 - [x] **Week 6** — Competitor benchmarking (top 2-3 local competitors per lead), Proposal Generator (AI scope + pricing proposal, built on Week 5's audit findings)
-- [ ] **Week 7 (in progress)** — Multi-language outreach ✅, Lead status tracking ✅, Lead Lists (save searches into named lists), UI polish pass
+- [x] **Week 7** — Multi-language outreach (Hindi/Gujarati/Tamil/Marathi), Lead status tracking (New/Contacted/Replied/Won/Lost + notes), Lead Lists (save leads into named, persistent lists), UI polish pass
 
 ---
 
