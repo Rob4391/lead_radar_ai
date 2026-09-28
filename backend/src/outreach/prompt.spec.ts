@@ -1,4 +1,4 @@
-import { buildOutreachPrompt, parseOutreachResponse } from './prompt';
+import { buildOutreachPrompt, isOutreachLanguage, parseOutreachResponse } from './prompt';
 
 describe('buildOutreachPrompt', () => {
     it('calls out specific weak points for a lead with no website or socials', () => {
@@ -19,6 +19,28 @@ describe('buildOutreachPrompt', () => {
         });
         expect(prompt).toContain('generally solid online presence');
         expect(prompt).not.toContain('no website');
+    });
+
+    it('defaults to English when no language is given', () => {
+        const prompt = buildOutreachPrompt({ name: 'Test Biz' });
+        expect(prompt).toContain('entirely in English');
+    });
+
+    it('instructs the model to write in the requested language', () => {
+        const prompt = buildOutreachPrompt({ name: 'Test Biz' }, 'hindi');
+        expect(prompt).toContain('entirely in Hindi');
+    });
+});
+
+describe('isOutreachLanguage', () => {
+    it('accepts a known language', () => {
+        expect(isOutreachLanguage('gujarati')).toBe(true);
+    });
+
+    it('rejects an unknown value', () => {
+        expect(isOutreachLanguage('klingon')).toBe(false);
+        expect(isOutreachLanguage(undefined)).toBe(false);
+        expect(isOutreachLanguage(42)).toBe(false);
     });
 });
 

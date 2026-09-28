@@ -14,7 +14,21 @@ export interface OutreachMessages {
     whatsappMessage: string;
 }
 
-export function buildOutreachPrompt(lead: OutreachLead): string {
+export type OutreachLanguage = 'english' | 'hindi' | 'gujarati' | 'tamil' | 'marathi';
+
+const LANGUAGE_NAMES: Record<OutreachLanguage, string> = {
+    english: 'English',
+    hindi: 'Hindi',
+    gujarati: 'Gujarati',
+    tamil: 'Tamil',
+    marathi: 'Marathi',
+};
+
+export function isOutreachLanguage(value: unknown): value is OutreachLanguage {
+    return typeof value === 'string' && value in LANGUAGE_NAMES;
+}
+
+export function buildOutreachPrompt(lead: OutreachLead, language: OutreachLanguage = 'english'): string {
     const gaps: string[] = [];
     if (!lead.website) gaps.push('no website');
     if ((lead.reviewCount ?? 0) < 10) gaps.push('very few Google reviews');
@@ -30,7 +44,7 @@ Website: ${lead.website || 'none'}
 Google reviews: ${lead.reviewCount ?? 'unknown'}
 Weak points: ${gaps.length > 0 ? gaps.join(', ') : 'generally solid online presence'}
 
-Write three short, non-generic outreach messages that reference the specific weak points above. Keep them friendly, concise, and low-pressure — no hard-sell language, no exclamation-mark spam, no fake urgency.
+Write three short, non-generic outreach messages that reference the specific weak points above. Keep them friendly, concise, and low-pressure — no hard-sell language, no exclamation-mark spam, no fake urgency. Write all three messages entirely in ${LANGUAGE_NAMES[language]}, including the email subject line.
 
 Respond with ONLY a JSON object (no markdown fences, no commentary) with exactly these keys:
 {
