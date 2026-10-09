@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
+import helmet from 'helmet';
 import { BullModule } from '@nestjs/bull';
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
@@ -35,6 +37,8 @@ import { ListsService } from './lists/lists.service';
             },
         }),
         BullModule.registerQueue({ name: 'lead-collection' }),
+        // Per-user default; routes that call the LLM, the audit or Places override it lower.
+        ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
     ],
     controllers: [LeadsController, BillingController, ListsController],
     providers: [LeadsService, PlacesService, LeadCollectionProcessor, OutreachService, RazorpayService, SubscriptionService, AuditService, ProposalService, ListsService],
@@ -43,7 +47,11 @@ class AppModule { }
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, { rawBody: true });
-    app.enableCors();
+    app.use(helmet());
+    // The browser talks to Next.js, which calls this API server-to-server, so
+    // only our own frontend origin(s) ever need CORS access.
+    app.enableCors({ origin: (process.env.FRONTEND_ORIGIN || 'http://localhost:3000').split(',').map((o) => o.trim()) });
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.listen(3001);
 }
 

@@ -46,6 +46,28 @@ describe('ApiKeyGuard', () => {
         await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
+    it('ignores the admin key in production unless explicitly enabled', async () => {
+        process.env.ADMIN_API_KEY = 'secret-admin-key';
+        process.env.NODE_ENV = 'production';
+        delete process.env.ENABLE_ADMIN_API_KEY;
+        const ctx = contextWithHeaders({ 'x-api-key': 'secret-admin-key' });
+        await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('accepts the admin key in production when ENABLE_ADMIN_API_KEY=true', async () => {
+        process.env.ADMIN_API_KEY = 'secret-admin-key';
+        process.env.NODE_ENV = 'production';
+        process.env.ENABLE_ADMIN_API_KEY = 'true';
+        const ctx = contextWithHeaders({ 'x-api-key': 'secret-admin-key' });
+        await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it('rejects an admin key that is a prefix of the real one', async () => {
+        process.env.ADMIN_API_KEY = 'secret-admin-key';
+        const ctx = contextWithHeaders({ 'x-api-key': 'secret' });
+        await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
     it('rejects a bearer token when CLERK_SECRET_KEY is not configured', async () => {
         delete process.env.ADMIN_API_KEY;
         delete process.env.CLERK_SECRET_KEY;

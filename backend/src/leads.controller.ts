@@ -1,4 +1,5 @@
-import { Controller, Get, Query, Post, Patch, Body, Res, Req, UseGuards, Param, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Post, Patch, Body, Res, Req, UseGuards, Param, ParseIntPipe, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
@@ -14,19 +15,15 @@ import { UnsafeUrlError } from './audit/safe-fetch';
 import { ProposalService } from './proposal/proposal.service';
 import { isLeadStatus } from './lead-status';
 import { AuthedRequest, requireAdmin, requireUserId } from './auth-context';
+import { UserThrottlerGuard } from './user-throttler.guard';
+import { CollectLeadsDto, CreateLeadDto, ScoreLeadsDto, UpdateStatusDto } from './leads.dto';
 
-class CreateLeadDto {
-    name?: string;
-    phone?: string;
-    website?: string;
-    emails?: string[];
-    urls?: string[];
-    titles?: string[];
-    city?: string;
-    category?: string;
-}
+// LLM generation and new Places searches cost CPU time or money; audits are
+// free outbound fetches, so agencies auditing a page of results get more room.
+const EXPENSIVE = { default: { limit: 10, ttl: 60_000 } };
+const AUDIT = { default: { limit: 30, ttl: 60_000 } };
 
-@UseGuards(ApiKeyGuard)
+@UseGuards(ApiKeyGuard, UserThrottlerGuard)
 @Controller('leads')
 export class LeadsController {
     constructor(
@@ -54,8 +51,9 @@ export class LeadsController {
         return this.leadsService.create(dto);
     }
 
+    @Throttle(EXPENSIVE)
     @Post('collect')
-    async collect(@Req() req: AuthedRequest, @Body() dto: { city: string; category: string }) {
+    async collect(@Req() req: AuthedRequest, @Body() dto: CollectLeadsDto) {
         console.log(`[Collect] Request for ${dto.city} / ${dto.category}`);
 
         // Check cache first
@@ -92,8 +90,8 @@ export class LeadsController {
     }
 
     @Get('collect-status/:jobId')
-    async getCollectStatus(@Req() req: AuthedRequest, @Param('jobId') jobId: string) {
-        const job = await this.leadQueue.getJob(Number(jobId));
+    async getCollectStatus(@Req() req: AuthedRequest, @Param('jobId', ParseIntPipe) jobId: number) {
+        const job = await this.leadQueue.getJob(jobId);
         if (!job) {
             console.log(`[Status] Job ${jobId} not found`);
             return { error: 'Job not found', jobId };
@@ -124,15 +122,16 @@ export class LeadsController {
     }
 
     @Post('score')
-    async score(@Req() req: AuthedRequest, @Body() dto: { city?: string; category?: string }) {
+    async score(@Req() req: AuthedRequest, @Body() dto: ScoreLeadsDto) {
         requireAdmin(req);
         const updated = await this.leadsService.scoreLeads({ city: dto?.city, category: dto?.category });
         return { message: `Scored ${updated.length} lead(s)`, count: updated.length };
     }
 
+    @Throttle(EXPENSIVE)
     @Post(':id/outreach')
-    async generateOutreach(@Req() req: AuthedRequest, @Param('id') id: string, @Query('force') force?: string, @Query('language') language?: string) {
-        const lead = await this.leadsService.findById(Number(id));
+    async generateOutreach(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number, @Query('force') force?: string, @Query('language') language?: string) {
+        const lead = await this.leadsService.findById(id);
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
@@ -165,9 +164,10 @@ export class LeadsController {
         }
     }
 
+    @Throttle(AUDIT)
     @Post(':id/audit')
-    async auditLead(@Param('id') id: string, @Query('force') force?: string) {
-        const lead = await this.leadsService.findById(Number(id));
+    async auditLead(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) {
+        const lead = await this.leadsService.findById(id);
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
@@ -198,9 +198,10 @@ export class LeadsController {
         }
     }
 
+    @Throttle(EXPENSIVE)
     @Post(':id/proposal')
-    async generateProposal(@Req() req: AuthedRequest, @Param('id') id: string, @Query('force') force?: string) {
-        const lead = await this.leadsService.findById(Number(id));
+    async generateProposal(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number, @Query('force') force?: string) {
+        const lead = await this.leadsService.findById(id);
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
@@ -221,9 +222,9 @@ export class LeadsController {
     }
 
     @Patch(':id/status')
-    async updateStatus(@Req() req: AuthedRequest, @Param('id') id: string, @Body() dto: { status?: string; notes?: string }) {
+    async updateStatus(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateStatusDto) {
         const userId = requireUserId(req);
-        const lead = await this.leadsService.findById(Number(id));
+        const lead = await this.leadsService.findById(id);
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
@@ -236,8 +237,8 @@ export class LeadsController {
     }
 
     @Get(':id/competitors')
-    async getCompetitors(@Param('id') id: string) {
-        const competitors = await this.leadsService.findCompetitors(Number(id));
+    async getCompetitors(@Param('id', ParseIntPipe) id: number) {
+        const competitors = await this.leadsService.findCompetitors(id);
         if (competitors === null) {
             throw new NotFoundException(`Lead ${id} not found`);
         }

@@ -1,5 +1,17 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { verifyToken } from '@clerk/backend';
+import { timingSafeEqual } from 'node:crypto';
+
+// The admin key bypasses per-user auth, so in production it stays off unless
+// explicitly enabled, and is compared in constant time.
+function adminKeyMatches(provided: unknown): boolean {
+    const expected = process.env.ADMIN_API_KEY;
+    if (typeof provided !== 'string' || !expected) return false;
+    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_API_KEY !== 'true') return false;
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
+}
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -8,7 +20,7 @@ export class ApiKeyGuard implements CanActivate {
 
         // 1. Legacy/admin API key (used by seed/CI scripts and internal tooling).
         const headerKey = req.headers['x-api-key'] || req.headers['x-api_key'] || req.headers['apikey'];
-        if (headerKey && process.env.ADMIN_API_KEY && headerKey === process.env.ADMIN_API_KEY) {
+        if (adminKeyMatches(headerKey)) {
             req.isAdmin = true;
             return true;
         }
