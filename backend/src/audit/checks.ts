@@ -13,8 +13,11 @@ export function isWebsiteOld(
     return { ageYears: Math.round(ageYears * 10) / 10, isOld: ageYears >= 5 };
 }
 
+// HTML5 allows unquoted attribute values (<meta name=viewport ...>, <a href=/about>),
+// which minified sites use a lot. Requiring quotes misreported such sites as not
+// mobile-friendly and silently skipped their links in the broken-link check.
 export function hasViewportMetaTag(html: string): boolean {
-    return /<meta[^>]+name=["']viewport["']/i.test(html);
+    return /<meta\b[^>]*\bname\s*=\s*["']?viewport["'\s>/]/i.test(html);
 }
 
 export function isSlowLoad(loadTimeMs: number, thresholdMs = 3000): boolean {
@@ -27,13 +30,13 @@ export function classifyPerformanceScore(score: number | null, threshold = 0.5):
 }
 
 export function extractInternalLinks(html: string, baseUrl: string, limit = 5): string[] {
-    const hrefRegex = /href=["']([^"']+)["']/gi;
+    const hrefRegex = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
     const base = new URL(baseUrl);
     const links = new Set<string>();
     let match: RegExpExecArray | null;
     while ((match = hrefRegex.exec(html)) !== null && links.size < limit) {
         try {
-            const resolved = new URL(match[1], base);
+            const resolved = new URL(match[1] ?? match[2] ?? match[3], base);
             if (resolved.hostname === base.hostname && resolved.href !== base.href) {
                 links.add(resolved.href);
             }

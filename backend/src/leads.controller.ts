@@ -10,6 +10,7 @@ import { OutreachService } from './outreach/outreach.service';
 import { isOutreachLanguage } from './outreach/prompt';
 import { SubscriptionService } from './billing/subscription.service';
 import { AuditService } from './audit/audit.service';
+import { UnsafeUrlError } from './audit/safe-fetch';
 import { ProposalService } from './proposal/proposal.service';
 import { isLeadStatus } from './lead-status';
 import { AuthedRequest, requireAdmin, requireUserId } from './auth-context';
@@ -190,6 +191,9 @@ export class LeadsController {
             await this.leadsService.saveAudit(lead.id, audit);
             return { ...audit, cached: false };
         } catch (err) {
+            if (err instanceof UnsafeUrlError) {
+                throw new BadRequestException(err.message);
+            }
             throw new InternalServerErrorException((err as Error).message);
         }
     }

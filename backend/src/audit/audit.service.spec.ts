@@ -1,3 +1,11 @@
+// Network safety is covered in safe-fetch.spec.ts; here safeFetch just
+// delegates to the mocked global fetch so these tests stay offline.
+jest.mock('./safe-fetch', () => ({
+    ...jest.requireActual('./safe-fetch'),
+    assertPublicUrl: jest.fn().mockResolvedValue(undefined),
+    safeFetch: (url: string, init?: any) => (global.fetch as any)(url, init),
+}));
+
 import { AuditService } from './audit.service';
 
 describe('AuditService', () => {
