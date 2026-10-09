@@ -120,51 +120,45 @@ npm run dev             # http://localhost:3000
 
 ## API
 
-All routes below live under `/leads` on the backend and require auth (see [Auth model](#auth-model)).
+Every route requires auth (see [Auth model](#auth-model)). What a caller can do depends on *who* they are:
+
+**Shared lead data** — a signed-in user (`Authorization: Bearer <Clerk token>`) or the admin key:
 
 ```bash
 # Kick off a search — returns cached leads instantly, or a jobId to poll
 curl -X POST localhost:3001/leads/collect \
-  -H "x-api-key: $ADMIN_API_KEY" -H "content-type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "content-type: application/json" \
   -d '{"city": "Ahmedabad", "category": "Dentist"}'
 
 # Poll job status
-curl localhost:3001/leads/collect-status/42 -H "x-api-key: $ADMIN_API_KEY"
+curl localhost:3001/leads/collect-status/42 -H "Authorization: Bearer $TOKEN"
 
-# Recompute opportunity scores for a city/category
-curl -X POST localhost:3001/leads/score \
-  -H "x-api-key: $ADMIN_API_KEY" -H "content-type: application/json" \
-  -d '{"city": "Ahmedabad", "category": "Dentist"}'
-
-# Export as CSV
+# Export as CSV (includes your own outreach columns when called as a user)
 curl "localhost:3001/leads/export?city=Ahmedabad&category=Dentist" \
-  -H "x-api-key: $ADMIN_API_KEY" -o leads.csv
+  -H "Authorization: Bearer $TOKEN" -o leads.csv
 
-# Generate outreach messages for a lead (cached; add ?force=true to regenerate,
-# or ?language=hindi|gujarati|tamil|marathi to generate in another language)
-curl -X POST localhost:3001/leads/17/outreach -H "x-api-key: $ADMIN_API_KEY"
-
-# Audit a lead's website (cached; add ?force=true to re-audit)
-curl -X POST localhost:3001/leads/17/audit -H "x-api-key: $ADMIN_API_KEY"
-
-# Generate a scope + pricing proposal for a lead (cached; add ?force=true to regenerate)
-curl -X POST localhost:3001/leads/17/proposal -H "x-api-key: $ADMIN_API_KEY"
+# Audit a lead's website (cached and shared; add ?force=true to re-audit)
+curl -X POST localhost:3001/leads/17/audit -H "Authorization: Bearer $TOKEN"
 
 # Get a lead's top 2-3 local competitors, ranked by strongest online presence
-curl localhost:3001/leads/17/competitors -H "x-api-key: $ADMIN_API_KEY"
-
-# Update a lead's pipeline status (NEW/CONTACTED/REPLIED/WON/LOST) and notes
-curl -X PATCH localhost:3001/leads/17/status -H "x-api-key: $ADMIN_API_KEY" \
-  -H "content-type: application/json" -d '{"status": "CONTACTED", "notes": "Left voicemail"}'
-
-# List pricing tiers (public, no auth)
-curl localhost:3001/billing/plans
+curl localhost:3001/leads/17/competitors -H "Authorization: Bearer $TOKEN"
 ```
 
-`/lists` is per-user data, so unlike the routes above it has **no** `x-api-key` admin bypass — every request needs a real Clerk-authenticated user:
+**Your own work on a lead** — signed-in user only. Each agency's outreach, proposals, status and notes are private to that agency; the admin key gets a 403 here:
 
 ```bash
-# Requires a real Clerk Bearer token, not x-api-key (see Auth model)
+# Generate outreach messages (cached per user; ?force=true regenerates,
+# ?language=hindi|gujarati|tamil|marathi generates in another language)
+curl -X POST localhost:3001/leads/17/outreach -H "Authorization: Bearer $TOKEN"
+
+# Generate a scope + pricing proposal (cached per user; ?force=true regenerates)
+curl -X POST localhost:3001/leads/17/proposal -H "Authorization: Bearer $TOKEN"
+
+# Update your pipeline status (NEW/CONTACTED/REPLIED/WON/LOST) and notes
+curl -X PATCH localhost:3001/leads/17/status -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" -d '{"status": "CONTACTED", "notes": "Left voicemail"}'
+
+# Lists
 curl -X POST localhost:3001/lists -H "Authorization: Bearer $TOKEN" \
   -H "content-type: application/json" -d '{"name": "Q4 Hot Leads"}'
 curl localhost:3001/lists -H "Authorization: Bearer $TOKEN"
@@ -172,18 +166,36 @@ curl -X POST localhost:3001/lists/1/leads -H "Authorization: Bearer $TOKEN" \
   -H "content-type: application/json" -d '{"leadId": 17}'
 ```
 
-From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/leads/*` and `/api/proxy/lists/*`.
+**Admin tooling** — `x-api-key: $ADMIN_API_KEY` only:
+
+```bash
+# Insert a lead by hand (normal leads come from Google Places)
+curl -X POST localhost:3001/leads -H "x-api-key: $ADMIN_API_KEY" \
+  -H "content-type: application/json" -d '{"name": "Test Biz", "website": "https://example.com"}'
+
+# Recompute opportunity scores for a city/category
+curl -X POST localhost:3001/leads/score -H "x-api-key: $ADMIN_API_KEY" \
+  -H "content-type: application/json" -d '{"city": "Ahmedabad", "category": "Dentist"}'
+```
+
+`GET /billing/plans` is public. From the browser, the frontend never touches `ADMIN_API_KEY` — it signs requests with the logged-in user's Clerk session token automatically via `/api/proxy/*`.
+
+Request bodies are validated (unknown fields, missing fields, over-long values and non-numeric ids get a `400`), and routes are rate-limited per user: 120/min by default, 30/min for audits, 10/min for outreach, proposals and new searches (`429` when exceeded).
 
 ---
 
 ## Auth model
 
-Every `/leads/*` route is guarded (`ApiKeyGuard`, [`backend/src/api-key.guard.ts`](backend/src/api-key.guard.ts)) and accepts either:
+Every route is guarded by `ApiKeyGuard` ([`backend/src/api-key.guard.ts`](backend/src/api-key.guard.ts)), which accepts either:
 
 1. **A Clerk session token** — `Authorization: Bearer <token>`, verified server-side against `CLERK_SECRET_KEY`. This is what the frontend sends automatically for signed-in users.
-2. **`x-api-key: <ADMIN_API_KEY>`** — a legacy/admin bypass for internal scripts, seeding, and CI, where there's no logged-in Clerk user.
+2. **`x-api-key: <ADMIN_API_KEY>`** — for internal scripts, seeding and CI, where there's no logged-in user. Compared in constant time, and **ignored when `NODE_ENV=production`** unless `ENABLE_ADMIN_API_KEY=true` is set. It sees shared lead data only, never any user's private work.
 
-On the frontend, `middleware.ts` enforces sign-in on `/search`, `/pricing`, and `/api/proxy/*` — an anonymous visitor is redirected to sign-in before ever reaching a lead.
+**Data ownership:** a lead's business facts (name, phone, website, reviews, score) and its audit results are shared — they're public information, and one Google Places lookup or audit serves everyone. Everything a user *does* with a lead (outreach, proposals, status, notes, lists) is stored per user and never visible to other users.
+
+**Website audit safety:** the audit fetches lead websites server-side, so it refuses any URL that resolves to a private, loopback, link-local or cloud-metadata address (checked again at connect time and on every redirect), and only allows http(s) on standard ports.
+
+On the frontend, `middleware.ts` enforces sign-in on `/search`, `/pricing`, `/lists` and `/api/proxy/*` — an anonymous visitor is redirected to sign-in before ever reaching a lead. The backend also sends standard security headers (helmet) and only allows CORS from `FRONTEND_ORIGIN`.
 
 ---
 
@@ -200,11 +212,11 @@ Pricing tiers gate the number of new searches per 30-day period (cached results 
 
 Every signed-in user is granted the **Free** plan automatically on first use — no checkout, no payment. Unlike the paid tiers (which expire after 30 days and need repurchasing), Free auto-renews forever. It exists purely so the app is usable without needing a Razorpay account; `GET /billing/plans` deliberately excludes it since it isn't something to buy.
 
-Checkout for the paid tiers runs through Razorpay in **test mode** (free — no KYC or real payment method needed to build/test against it). Flow: `/pricing` → `POST /billing/checkout` creates a Razorpay order → Razorpay's Checkout widget collects a (fake, in test mode) payment → the client posts the result to `POST /billing/verify`, which checks the HMAC signature server-side and activates the plan for 30 days.
+Checkout for the paid tiers runs through Razorpay in **test mode** (free — no KYC or real payment method needed to build/test against it). Flow: `/pricing` → `POST /billing/checkout` creates a Razorpay order → Razorpay's Checkout widget collects a (fake, in test mode) payment → the client posts the result to `POST /billing/verify`, which checks the HMAC signature server-side and activates the plan for 30 days. What was bought, and for whom, is read from the Razorpay order itself (checkout records the plan and customer on the order) — never from the browser — so a payment for one plan can't be verified as a pricier one, or for another account.
 
 This is intentionally *not* Razorpay's native recurring Subscriptions API — each successful payment buys a flat 30-day period with no auto-renewal. Simpler to build and test; upgrading to real recurring billing later is a contained change in [`backend/src/billing/`](backend/src/billing/).
 
-`POST /billing/webhook` exists and verifies Razorpay's webhook signature, but isn't load-bearing for activation yet (that happens synchronously via `/billing/verify`) — it's there so a real webhook integration (e.g. handling failed renewals) has a secure landing point already wired up.
+`POST /billing/webhook` verifies Razorpay's signature and **also activates the plan** on `order.paid` / `payment.captured`, so a customer who pays and closes the tab before the redirect still gets upgraded. Each order activates a plan **at most once** (a `Payment` row with a unique order id), so the webhook and `/billing/verify` can both arrive safely, and replaying an old payment can't renew a plan for free. To use it in production, add a webhook in the Razorpay dashboard pointing at `https://<your-domain>/billing/webhook` and set its secret as `RAZORPAY_WEBHOOK_SECRET`.
 
 ---
 
@@ -215,14 +227,16 @@ This is intentionally *not* Razorpay's native recurring Subscriptions API — ea
 | `DATABASE_URL` | backend | Postgres connection string |
 | `CLERK_SECRET_KEY` | backend, frontend | Verifies/generates Clerk session tokens |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | frontend | Clerk client SDK |
-| `ADMIN_API_KEY` | backend | Legacy auth bypass for scripts/CI |
+| `ADMIN_API_KEY` | backend | Admin key for scripts/CI (shared data only) |
+| `ENABLE_ADMIN_API_KEY` | backend | Set to `true` to allow the admin key when `NODE_ENV=production` (off by default) |
+| `FRONTEND_ORIGIN` | backend | Comma-separated origins allowed by CORS (default `http://localhost:3000`) |
 | `GOOGLE_PLACES_API_KEY` | backend | Lead collection source |
 | `REDIS_URL` | backend | Bull job queue |
 | `LLM_PROVIDER` | backend | `ollama` (default, free/local) or `anthropic` |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | backend | Ollama endpoint (default `localhost:11434`) / model (default `qwen2.5:1.5b`) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | backend | Only used when `LLM_PROVIDER=anthropic` (paid API, default `claude-sonnet-5`) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | backend | Billing checkout (free test-mode keys) |
-| `RAZORPAY_WEBHOOK_SECRET` | backend | Verifies `POST /billing/webhook` signatures |
+| `RAZORPAY_WEBHOOK_SECRET` | backend | Verifies `POST /billing/webhook` signatures (set when the webhook is created in the Razorpay dashboard) |
 | `PAGESPEED_API_KEY` | backend | Optional — enables the audit's slow-load check via Google PageSpeed Insights |
 | `BACKEND_URL` | frontend | Where `/api/proxy/*` forwards requests |
 
@@ -233,7 +247,7 @@ See [`backend/.env.example`](backend/.env.example).
 ## Tests
 
 ```bash
-cd backend && npm test        # scoring, CSV formatting, auth guard, Places API client, outreach, billing
+cd backend && npm test        # scoring, CSV, auth guard, audit + SSRF guard, outreach, proposals, billing, per-user data
 cd frontend && npx tsc --noEmit   # typecheck
 ```
 
@@ -250,6 +264,11 @@ CI runs both on every push/PR to `main` — see [`.github/workflows/ci-prisma-ba
 - [x] **Week 5** — Online Presence Audit (website age, mobile-friendliness, broken links), WhatsApp click-to-chat deep-link
 - [x] **Week 6** — Competitor benchmarking (top 2-3 local competitors per lead), Proposal Generator (AI scope + pricing proposal, built on Week 5's audit findings)
 - [x] **Week 7** — Multi-language outreach (Hindi/Gujarati/Tamil/Marathi), Lead status tracking (New/Contacted/Replied/Won/Lost + notes), Lead Lists (save leads into named, persistent lists), UI polish pass
+- [x] **Week 8** — Security & data isolation: per-user outreach/proposals/status/notes, SSRF-safe website audit, input validation, per-user rate limits, security headers, locked CORS, production-safe admin key, billing fixes (plan read from the order, replay-proof activation, webhook activation)
+- [ ] **Week 9** — Data quality: email finding, Instagram/Facebook detection, Google rating, filter by audit problem, Google Sheets export
+- [ ] **Week 10** — Sell-ready & global: free trial, shareable audit report link, country-wise currency (USD default), one pricing model, any-country phone numbers, terms/privacy
+- [ ] **Week 11** — Team accounts, follow-up reminders
+- [ ] **Week 12** — Deploy to GCP with backups and error tracking; NestJS/Clerk upgrades
 
 ---
 
