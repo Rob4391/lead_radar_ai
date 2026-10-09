@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, ParseIntPipe, Req, UseGuards, NotFoundException, ConflictException } from '@nestjs/common';
 import { ApiKeyGuard } from '../api-key.guard';
 import { ListsService } from './lists.service';
 import { AuthedRequest, requireUserId } from '../auth-context';
+import { UserThrottlerGuard } from '../user-throttler.guard';
+import { AddLeadToListDto, CreateListDto } from './lists.dto';
 
-@UseGuards(ApiKeyGuard)
+@UseGuards(ApiKeyGuard, UserThrottlerGuard)
 @Controller('lists')
 export class ListsController {
     constructor(private readonly listsService: ListsService) { }
@@ -14,16 +16,20 @@ export class ListsController {
     }
 
     @Post()
-    async create(@Req() req: AuthedRequest, @Body() dto: { name?: string }) {
-        if (!dto.name || !dto.name.trim()) {
-            throw new BadRequestException('A list name is required.');
+    async create(@Req() req: AuthedRequest, @Body() dto: CreateListDto) {
+        try {
+            return await this.listsService.create(requireUserId(req), dto.name.trim());
+        } catch (err) {
+            if ((err as { code?: string }).code === 'P2002') {
+                throw new ConflictException('You already have a list with this name.');
+            }
+            throw err;
         }
-        return this.listsService.create(requireUserId(req), dto.name.trim());
     }
 
     @Get(':id')
-    async findOne(@Req() req: AuthedRequest, @Param('id') id: string) {
-        const list = await this.listsService.getListWithLeads(requireUserId(req), Number(id));
+    async findOne(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number) {
+        const list = await this.listsService.getListWithLeads(requireUserId(req), id);
         if (!list) {
             throw new NotFoundException(`List ${id} not found`);
         }
@@ -31,11 +37,8 @@ export class ListsController {
     }
 
     @Post(':id/leads')
-    async addLead(@Req() req: AuthedRequest, @Param('id') id: string, @Body() dto: { leadId?: number }) {
-        if (!dto.leadId) {
-            throw new BadRequestException('leadId is required.');
-        }
-        const result = await this.listsService.addLead(requireUserId(req), Number(id), dto.leadId);
+    async addLead(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number, @Body() dto: AddLeadToListDto) {
+        const result = await this.listsService.addLead(requireUserId(req), id, dto.leadId);
         if (!result) {
             throw new NotFoundException(`List ${id} not found`);
         }
@@ -43,8 +46,8 @@ export class ListsController {
     }
 
     @Delete(':id/leads/:leadId')
-    async removeLead(@Req() req: AuthedRequest, @Param('id') id: string, @Param('leadId') leadId: string) {
-        const result = await this.listsService.removeLead(requireUserId(req), Number(id), Number(leadId));
+    async removeLead(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number, @Param('leadId', ParseIntPipe) leadId: number) {
+        const result = await this.listsService.removeLead(requireUserId(req), id, leadId);
         if (result === null) {
             throw new NotFoundException(`List ${id} not found`);
         }
@@ -52,8 +55,8 @@ export class ListsController {
     }
 
     @Delete(':id')
-    async remove(@Req() req: AuthedRequest, @Param('id') id: string) {
-        const result = await this.listsService.deleteList(requireUserId(req), Number(id));
+    async remove(@Req() req: AuthedRequest, @Param('id', ParseIntPipe) id: number) {
+        const result = await this.listsService.deleteList(requireUserId(req), id);
         if (result === null) {
             throw new NotFoundException(`List ${id} not found`);
         }
