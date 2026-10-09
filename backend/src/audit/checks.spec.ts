@@ -33,6 +33,19 @@ describe('hasViewportMetaTag', () => {
     });
 });
 
+describe('hasViewportMetaTag (attribute variants)', () => {
+    it.each([
+        ['unquoted, as on example.com', '<meta name=viewport content="width=device-width,initial-scale=1">'],
+        ['single-quoted', "<meta name='viewport' content='width=device-width'>"],
+        ['content before name', '<meta content="width=device-width" name="viewport">'],
+        ['spaces around =', '<meta name = "viewport" content="width=device-width">'],
+    ])('detects %s', (_label, html) => expect(hasViewportMetaTag(html)).toBe(true));
+
+    it('does not match a different meta name that merely starts with viewport', () => {
+        expect(hasViewportMetaTag('<meta name=viewport-fake content="x">')).toBe(false);
+    });
+});
+
 describe('isSlowLoad', () => {
     it('flags load times above the threshold', () => {
         expect(isSlowLoad(4000)).toBe(true);
@@ -74,5 +87,16 @@ describe('extractInternalLinks', () => {
         const html = `<a href="/a">a</a><a href="/b">b</a><a href="/c">c</a>`;
         const links = extractInternalLinks(html, 'https://example.com', 2);
         expect(links).toHaveLength(2);
+    });
+});
+
+describe('extractInternalLinks (attribute variants)', () => {
+    it('picks up unquoted and single-quoted hrefs, not just double-quoted ones', () => {
+        const html = `<a href=/about>About</a> <a href='/contact'>Contact</a> <a href="/pricing">Pricing</a>`;
+        expect(extractInternalLinks(html, 'https://example.com')).toEqual([
+            'https://example.com/about',
+            'https://example.com/contact',
+            'https://example.com/pricing',
+        ]);
     });
 });

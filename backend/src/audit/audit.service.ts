@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { classifyPerformanceScore, extractInternalLinks, hasViewportMetaTag, isSlowLoad, isWebsiteOld } from './checks';
+import { assertPublicUrl, safeFetch, UnsafeUrlError } from './safe-fetch';
 
 export interface AuditResult {
     websiteAgeYears: number | null;
@@ -35,10 +36,11 @@ export class AuditService {
 
     private async getHomepageHtml(website: string): Promise<string | null> {
         try {
-            const res = await fetch(website);
+            const res = await safeFetch(website);
             if (!res.ok) return null;
             return await res.text();
         } catch (err) {
+            if (err instanceof UnsafeUrlError) throw err;
             this.logger.warn(`Homepage fetch failed for ${website}: ${(err as Error).message}`);
             return null;
         }
@@ -48,7 +50,7 @@ export class AuditService {
         const links = extractInternalLinks(html, website);
         for (const link of links) {
             try {
-                const res = await fetch(link, { method: 'HEAD' });
+                const res = await safeFetch(link, { method: 'HEAD' });
                 if (res.status >= 400) return true;
             } catch {
                 return true;
@@ -79,6 +81,9 @@ export class AuditService {
     }
 
     async auditWebsite(website: string): Promise<AuditResult> {
+        // Fail loudly (UnsafeUrlError) instead of saving "not mobile-friendly"
+        // for a site we refused to fetch.
+        await assertPublicUrl(website);
         const [ageResult, html, perf] = await Promise.all([
             this.getWebsiteAge(website),
             this.getHomepageHtml(website),
