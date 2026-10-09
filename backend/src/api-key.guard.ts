@@ -9,6 +9,7 @@ export class ApiKeyGuard implements CanActivate {
         // 1. Legacy/admin API key (used by seed/CI scripts and internal tooling).
         const headerKey = req.headers['x-api-key'] || req.headers['x-api_key'] || req.headers['apikey'];
         if (headerKey && process.env.ADMIN_API_KEY && headerKey === process.env.ADMIN_API_KEY) {
+            req.isAdmin = true;
             return true;
         }
 
