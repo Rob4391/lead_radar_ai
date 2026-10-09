@@ -25,11 +25,8 @@ model Lead {
   score    Float?
   createdAt DateTime @default(now())
 
-  coldEmail        String?
-  linkedinMessage  String?
-  whatsappMessage  String?
-  outreachGeneratedAt DateTime?
-
+  // Audit results are objective facts about a public website, so they stay
+  // shared across users (and one audit serves everyone who finds this lead).
   websiteAgeYears Float?
   isOldWebsite    Boolean?
   mobileFriendly  Boolean?
@@ -37,14 +34,31 @@ model Lead {
   hasBrokenPages  Boolean?
   auditedAt       DateTime?
 
+  listItems  ListLead[]
+  activities LeadActivity[]
+}
+
+// One user's private work on a lead. Leads themselves are shared public
+// business data; this is what must never leak between agencies.
+model LeadActivity {
+  id     Int    @id @default(autoincrement())
+  userId String
+  leadId Int
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  coldEmail           String?
+  linkedinMessage     String?
+  whatsappMessage     String?
+  outreachGeneratedAt DateTime?
+
   proposal            String?
   proposalGeneratedAt DateTime?
 
-  status    LeadStatus @default(NEW)
-  notes     String?
+  status          LeadStatus @default(NEW)
+  notes           String?
   statusUpdatedAt DateTime?
 
-  listItems ListLead[]
+  @@unique([userId, leadId])
 }
 
 model List {

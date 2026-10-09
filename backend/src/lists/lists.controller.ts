@@ -1,19 +1,7 @@
-import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { Request } from 'express';
+import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ApiKeyGuard } from '../api-key.guard';
 import { ListsService } from './lists.service';
-
-type AuthedRequest = Request & { auth?: { userId: string } };
-
-// Lists are per-user data, so unlike /leads there's no legacy x-api-key
-// bypass here - there's no "whose list is this" for an admin key to mean.
-function requireUserId(req: AuthedRequest): string {
-    const userId = req.auth?.userId;
-    if (!userId) {
-        throw new ForbiddenException('Lists require a signed-in user.');
-    }
-    return userId;
-}
+import { AuthedRequest, requireUserId } from '../auth-context';
 
 @UseGuards(ApiKeyGuard)
 @Controller('lists')

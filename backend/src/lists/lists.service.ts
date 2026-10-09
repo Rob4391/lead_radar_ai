@@ -1,9 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { LeadsService } from '../leads.service';
 
 @Injectable()
 export class ListsService implements OnModuleInit {
     private prisma = new PrismaClient();
+
+    constructor(private readonly leadsService: LeadsService) { }
 
     async onModuleInit() {
         await this.prisma.$connect();
@@ -37,7 +40,8 @@ export class ListsService implements OnModuleInit {
             orderBy: { addedAt: 'desc' },
             include: { lead: true },
         });
-        return { id: list.id, name: list.name, createdAt: list.createdAt, leads: items.map((i) => i.lead) };
+        const leads = await this.leadsService.withActivity(items.map((i) => i.lead), userId);
+        return { id: list.id, name: list.name, createdAt: list.createdAt, leads };
     }
 
     async addLead(userId: string, listId: number, leadId: number) {

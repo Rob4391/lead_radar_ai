@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { computeOpportunityScore } from './scoring';
 import { rankCompetitors } from './competitors';
 import { LeadStatus } from './lead-status';
+import { mergeActivities } from './lead-activity';
 
 @Injectable()
 export class LeadsService implements OnModuleInit {
@@ -59,13 +60,6 @@ export class LeadsService implements OnModuleInit {
         return this.prisma.lead.findUnique({ where: { id } });
     }
 
-    async saveOutreach(id: number, messages: { coldEmail: string; linkedinMessage: string; whatsappMessage: string }) {
-        return this.prisma.lead.update({
-            where: { id },
-            data: { ...messages, outreachGeneratedAt: new Date() },
-        });
-    }
-
     async saveAudit(id: number, audit: { websiteAgeYears: number | null; isOldWebsite: boolean; mobileFriendly: boolean; isSlowLoad: boolean; hasBrokenPages: boolean }) {
         return this.prisma.lead.update({
             where: { id },
@@ -73,21 +67,41 @@ export class LeadsService implements OnModuleInit {
         });
     }
 
-    async saveProposal(id: number, proposal: string) {
-        return this.prisma.lead.update({
-            where: { id },
-            data: { proposal, proposalGeneratedAt: new Date() },
+    async findActivity(userId: string, leadId: number) {
+        return this.prisma.leadActivity.findUnique({ where: { userId_leadId: { userId, leadId } } });
+    }
+
+    // Shared leads + this user's private activity, in the flat shape the
+    // frontend reads. Without a user (admin key) leads come back with defaults.
+    async withActivity<L extends { id: number }>(leads: L[], userId?: string) {
+        if (!userId || leads.length === 0) return mergeActivities(leads, []);
+        const activities = await this.prisma.leadActivity.findMany({
+            where: { userId, leadId: { in: leads.map((l) => l.id) } },
+        });
+        return mergeActivities(leads, activities);
+    }
+
+    private upsertActivity(userId: string, leadId: number, data: Record<string, unknown>) {
+        return this.prisma.leadActivity.upsert({
+            where: { userId_leadId: { userId, leadId } },
+            update: data,
+            create: { userId, leadId, ...data },
         });
     }
 
-    async updateStatus(id: number, status: LeadStatus, notes?: string) {
-        return this.prisma.lead.update({
-            where: { id },
-            data: {
-                status,
-                ...(notes !== undefined ? { notes } : {}),
-                statusUpdatedAt: new Date(),
-            },
+    async saveOutreach(userId: string, leadId: number, messages: { coldEmail: string; linkedinMessage: string; whatsappMessage: string }) {
+        return this.upsertActivity(userId, leadId, { ...messages, outreachGeneratedAt: new Date() });
+    }
+
+    async saveProposal(userId: string, leadId: number, proposal: string) {
+        return this.upsertActivity(userId, leadId, { proposal, proposalGeneratedAt: new Date() });
+    }
+
+    async updateStatus(userId: string, leadId: number, status: LeadStatus, notes?: string) {
+        return this.upsertActivity(userId, leadId, {
+            status,
+            ...(notes !== undefined ? { notes } : {}),
+            statusUpdatedAt: new Date(),
         });
     }
 

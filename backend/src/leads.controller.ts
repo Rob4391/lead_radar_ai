@@ -1,5 +1,5 @@
 import { Controller, Get, Query, Post, Patch, Body, Res, Req, UseGuards, Param, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { Response, Request } from 'express';
+import { Response } from 'express';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
 import { ApiKeyGuard } from './api-key.guard';
@@ -12,6 +12,7 @@ import { SubscriptionService } from './billing/subscription.service';
 import { AuditService } from './audit/audit.service';
 import { ProposalService } from './proposal/proposal.service';
 import { isLeadStatus } from './lead-status';
+import { AuthedRequest, requireAdmin, requireUserId } from './auth-context';
 
 class CreateLeadDto {
     name?: string;
@@ -38,17 +39,22 @@ export class LeadsController {
     ) { }
 
     @Get()
-    async list(@Query('city') city?: string, @Query('category') category?: string) {
-        return this.leadsService.findAll({ city, category });
+    async list(@Req() req: AuthedRequest, @Query('city') city?: string, @Query('category') category?: string) {
+        const leads = await this.leadsService.findAll({ city, category });
+        return this.leadsService.withActivity(leads, req.auth?.userId);
     }
 
     @Post()
-    async create(@Body() dto: CreateLeadDto) {
+    async create(@Req() req: AuthedRequest, @Body() dto: CreateLeadDto) {
+        // Leads normally come from Google Places. Letting any user insert one
+        // with an arbitrary website would let them aim the server-side audit
+        // fetch anywhere, so manual creation is admin tooling only.
+        requireAdmin(req);
         return this.leadsService.create(dto);
     }
 
     @Post('collect')
-    async collect(@Req() req: Request & { auth?: { userId: string } }, @Body() dto: { city: string; category: string }) {
+    async collect(@Req() req: AuthedRequest, @Body() dto: { city: string; category: string }) {
         console.log(`[Collect] Request for ${dto.city} / ${dto.category}`);
 
         // Check cache first
@@ -56,7 +62,7 @@ export class LeadsController {
         // existing is already an array from findMany()
         if (Array.isArray(existing) && existing.length > 0) {
             console.log(`[Collect] Found ${existing.length} cached leads`);
-            return existing;
+            return this.leadsService.withActivity(existing, req.auth?.userId);
         }
 
         // Only Clerk-authenticated requests carry req.auth; the legacy x-api-key
@@ -85,7 +91,7 @@ export class LeadsController {
     }
 
     @Get('collect-status/:jobId')
-    async getCollectStatus(@Param('jobId') jobId: string) {
+    async getCollectStatus(@Req() req: AuthedRequest, @Param('jobId') jobId: string) {
         const job = await this.leadQueue.getJob(Number(jobId));
         if (!job) {
             console.log(`[Status] Job ${jobId} not found`);
@@ -103,7 +109,7 @@ export class LeadsController {
                 category: job.data.category,
             });
             // findAll returns array directly from Prisma findMany
-            const leads = Array.isArray(leadsResult) ? leadsResult : [];
+            const leads = await this.leadsService.withActivity(Array.isArray(leadsResult) ? leadsResult : [], req.auth?.userId);
             console.log(`[Status ${jobId}] Job done. Returning ${leads.length} leads`);
             return { status: 'done', leads, result };
         }
@@ -117,13 +123,14 @@ export class LeadsController {
     }
 
     @Post('score')
-    async score(@Body() dto: { city?: string; category?: string }) {
+    async score(@Req() req: AuthedRequest, @Body() dto: { city?: string; category?: string }) {
+        requireAdmin(req);
         const updated = await this.leadsService.scoreLeads({ city: dto?.city, category: dto?.category });
         return { message: `Scored ${updated.length} lead(s)`, count: updated.length };
     }
 
     @Post(':id/outreach')
-    async generateOutreach(@Param('id') id: string, @Query('force') force?: string, @Query('language') language?: string) {
+    async generateOutreach(@Req() req: AuthedRequest, @Param('id') id: string, @Query('force') force?: string, @Query('language') language?: string) {
         const lead = await this.leadsService.findById(Number(id));
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
@@ -137,18 +144,20 @@ export class LeadsController {
         // itself a reason to regenerate, same as ?force=true.
         const isDefaultLanguage = !language || language === 'english';
 
-        if (!force && isDefaultLanguage && lead.coldEmail && lead.linkedinMessage && lead.whatsappMessage) {
+        const userId = requireUserId(req);
+        const activity = await this.leadsService.findActivity(userId, lead.id);
+        if (!force && isDefaultLanguage && activity?.coldEmail && activity.linkedinMessage && activity.whatsappMessage) {
             return {
-                coldEmail: lead.coldEmail,
-                linkedinMessage: lead.linkedinMessage,
-                whatsappMessage: lead.whatsappMessage,
+                coldEmail: activity.coldEmail,
+                linkedinMessage: activity.linkedinMessage,
+                whatsappMessage: activity.whatsappMessage,
                 cached: true,
             };
         }
 
         try {
             const messages = await this.outreachService.generateMessages(lead, isOutreachLanguage(language) ? language : 'english');
-            await this.leadsService.saveOutreach(lead.id, messages);
+            await this.leadsService.saveOutreach(userId, lead.id, messages);
             return { ...messages, cached: false };
         } catch (err) {
             throw new InternalServerErrorException((err as Error).message);
@@ -186,19 +195,21 @@ export class LeadsController {
     }
 
     @Post(':id/proposal')
-    async generateProposal(@Param('id') id: string, @Query('force') force?: string) {
+    async generateProposal(@Req() req: AuthedRequest, @Param('id') id: string, @Query('force') force?: string) {
         const lead = await this.leadsService.findById(Number(id));
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
         }
 
-        if (!force && lead.proposal) {
-            return { proposal: lead.proposal, cached: true };
+        const userId = requireUserId(req);
+        const activity = await this.leadsService.findActivity(userId, lead.id);
+        if (!force && activity?.proposal) {
+            return { proposal: activity.proposal, cached: true };
         }
 
         try {
             const result = await this.proposalService.generateProposal(lead);
-            await this.leadsService.saveProposal(lead.id, result.proposal);
+            await this.leadsService.saveProposal(userId, lead.id, result.proposal);
             return { ...result, cached: false };
         } catch (err) {
             throw new InternalServerErrorException((err as Error).message);
@@ -206,7 +217,8 @@ export class LeadsController {
     }
 
     @Patch(':id/status')
-    async updateStatus(@Param('id') id: string, @Body() dto: { status?: string; notes?: string }) {
+    async updateStatus(@Req() req: AuthedRequest, @Param('id') id: string, @Body() dto: { status?: string; notes?: string }) {
+        const userId = requireUserId(req);
         const lead = await this.leadsService.findById(Number(id));
         if (!lead) {
             throw new NotFoundException(`Lead ${id} not found`);
@@ -214,7 +226,9 @@ export class LeadsController {
         if (!isLeadStatus(dto.status)) {
             throw new BadRequestException(`Unsupported status: ${dto.status}`);
         }
-        return this.leadsService.updateStatus(lead.id, dto.status, dto.notes);
+        await this.leadsService.updateStatus(userId, lead.id, dto.status, dto.notes);
+        const [merged] = await this.leadsService.withActivity([lead], userId);
+        return merged;
     }
 
     @Get(':id/competitors')
@@ -227,8 +241,8 @@ export class LeadsController {
     }
 
     @Get('export')
-    async export(@Res() res: Response, @Query('city') city?: string, @Query('category') category?: string) {
-        const leads = await this.leadsService.findAll({ city, category });
+    async export(@Req() req: AuthedRequest, @Res() res: Response, @Query('city') city?: string, @Query('category') category?: string) {
+        const leads = await this.leadsService.withActivity(await this.leadsService.findAll({ city, category }), req.auth?.userId);
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         const filenameParts = ['leads', city || 'all', category || 'all'];
