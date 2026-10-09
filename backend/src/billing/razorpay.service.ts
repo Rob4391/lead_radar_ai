@@ -18,15 +18,21 @@ export class RazorpayService {
         return this.client;
     }
 
-    async createOrder(plan: Plan) {
+    async createOrder(plan: Plan, userId: string) {
         const client = this.getClient();
         const { priceInPaise } = PLAN_CONFIG[plan];
         const order = await client.orders.create({
             amount: priceInPaise,
             currency: 'INR',
             receipt: `plan_${plan.toLowerCase()}_${Date.now()}`,
-            notes: { plan },
+            // Read back at verify/webhook time: the plan and customer come from
+            // here, never from the browser.
+            notes: { plan, userId },
         });
         return { orderId: order.id, amount: order.amount, currency: order.currency, keyId: process.env.RAZORPAY_KEY_ID };
+    }
+
+    async fetchOrder(orderId: string) {
+        return this.getClient().orders.fetch(orderId);
     }
 }
