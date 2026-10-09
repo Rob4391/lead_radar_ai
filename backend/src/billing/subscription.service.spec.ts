@@ -1,4 +1,5 @@
 let store: Record<string, any> = {};
+let payments: Record<string, any> = {};
 let nextId = 1;
 
 const mockPrisma = {
@@ -30,6 +31,15 @@ const mockPrisma = {
             return Promise.resolve(row);
         }),
     },
+    payment: {
+        findUnique: jest.fn(({ where: { orderId } }: any) => Promise.resolve(payments[orderId] ?? null)),
+        create: jest.fn(({ data }: any) => {
+            if (payments[data.orderId]) return Promise.reject(Object.assign(new Error('unique'), { code: 'P2002' }));
+            payments[data.orderId] = data;
+            return Promise.resolve(data);
+        }),
+    },
+    $transaction: jest.fn((fn: any) => fn(mockPrisma)),
 };
 
 jest.mock('@prisma/client', () => ({
@@ -43,6 +53,7 @@ describe('SubscriptionService', () => {
 
     beforeEach(() => {
         store = {};
+        payments = {};
         nextId = 1;
         jest.clearAllMocks();
         service = new SubscriptionService();
@@ -132,5 +143,34 @@ describe('SubscriptionService', () => {
         const status = await service.getStatus('user_5');
         expect(status.status).toBe('EXPIRED');
         expect(await service.canSearch('user_5')).toBe(false);
+    });
+
+    describe('activateFromPayment', () => {
+        const payment = { orderId: 'order_pay1', paymentId: 'pay_1', userId: 'user_p', plan: 'GROWTH' as const, amount: 299900 };
+
+        it('activates the plan and records the payment', async () => {
+            const result = await service.activateFromPayment(payment);
+            expect(result.alreadyProcessed).toBe(false);
+            expect(result.subscription).toMatchObject({ plan: 'GROWTH', status: 'ACTIVE' });
+            expect(payments['order_pay1']).toBeDefined();
+        });
+
+        it('refuses to replay the same payment to renew the plan for free', async () => {
+            await service.activateFromPayment(payment);
+            const firstEnd = store['user_p'].currentPeriodEnd;
+            await service.recordSearch('user_p');
+
+            const replay = await service.activateFromPayment(payment);
+            expect(replay.alreadyProcessed).toBe(true);
+            expect(store['user_p'].currentPeriodEnd).toBe(firstEnd); // period not extended
+            expect(store['user_p'].searchesThisPeriod).toBe(1);     // usage not reset
+        });
+
+        it('treats a concurrent duplicate (unique violation) as already processed', async () => {
+            mockPrisma.payment.findUnique.mockResolvedValueOnce(null);
+            payments['order_pay1'] = payment; // another request committed first
+            const result = await service.activateFromPayment(payment);
+            expect(result.alreadyProcessed).toBe(true);
+        });
     });
 });

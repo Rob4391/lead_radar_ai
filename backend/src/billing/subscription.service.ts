@@ -82,11 +82,11 @@ export class SubscriptionService {
         });
     }
 
-    async activate(userId: string, plan: Plan, razorpayOrderId: string) {
+    async activate(userId: string, plan: Plan, razorpayOrderId: string, db: Pick<PrismaClient, 'subscription'> = this.prisma) {
         const now = new Date();
         const periodEnd = new Date(now.getTime() + BILLING_PERIOD_DAYS * 24 * 60 * 60 * 1000);
         await this.getOrCreate(userId);
-        return this.prisma.subscription.update({
+        return db.subscription.update({
             where: { userId },
             data: {
                 plan: plan as PrismaPlan,
@@ -97,5 +97,33 @@ export class SubscriptionService {
                 lastRazorpayOrderId: razorpayOrderId,
             },
         });
+    }
+
+    /**
+     * Activates a plan for a verified payment - exactly once per order. Both
+     * /billing/verify and the Razorpay webhook call this; whichever arrives
+     * second (or any replay of an old payment) is a no-op.
+     */
+    async activateFromPayment(p: { orderId: string; paymentId: string; userId: string; plan: Plan; amount: number }) {
+        try {
+            return await this.prisma.$transaction(async (tx) => {
+                const existing = await tx.payment.findUnique({ where: { orderId: p.orderId } });
+                if (existing) {
+                    return { alreadyProcessed: true, subscription: await tx.subscription.findUnique({ where: { userId: p.userId } }) };
+                }
+                await tx.payment.create({
+                    data: { orderId: p.orderId, paymentId: p.paymentId, userId: p.userId, plan: p.plan as PrismaPlan, amount: p.amount },
+                });
+                const subscription = await this.activate(p.userId, p.plan, p.orderId, tx);
+                return { alreadyProcessed: false, subscription };
+            });
+        } catch (err) {
+            // A concurrent request recorded this order first (unique violation):
+            // it already activated the plan, so this one is a no-op too.
+            if ((err as { code?: string }).code === 'P2002') {
+                return { alreadyProcessed: true, subscription: await this.prisma.subscription.findUnique({ where: { userId: p.userId } }) };
+            }
+            throw err;
+        }
     }
 }

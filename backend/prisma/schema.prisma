@@ -117,3 +117,18 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// One row per Razorpay order that has activated a plan. The unique orderId is
+// what stops the same payment being replayed to renew a plan for free, and
+// lets /billing/verify and the webhook both fire without double-activating.
+model Payment {
+  id        Int      @id @default(autoincrement())
+  orderId   String   @unique
+  paymentId String
+  userId    String
+  plan      Plan
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
