@@ -56,29 +56,57 @@ Results cache on the `Lead` row (`auditedAt` + the individual fields); pass `?fo
 
 ## Architecture
 
-```
-┌────────────┐     Clerk sign-in     ┌──────────────────────┐
-│  Next.js   │  ──────────────────▶  │   /api/proxy/leads   │
-│  frontend  │  ◀──────────────────  │ (Next.js API route)  │
-└────────────┘      JSON / CSV       └──────────────────────┘
-                                                 │ Authorization: Bearer <token>
-                                                 ▼
-                                     ┌──────────────────────┐
-                                     │    NestJS backend    │
-                                     │ ApiKeyGuard verifies  │
-                                     │    Clerk token or     │
-                                     │ x-api-key (CI/admin)  │
-                                     └──────────────────────┘
-                                                 │
-                             ┌───────────────────┬───────────────────┐
-                             ▼                   ▼                   ▼
-                     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-                     │ Bull + Redis  │   │ Google Places │   │  PostgreSQL   │
-                     │   job queue   │ ▶ │      API      │ ▶ │  via Prisma   │
-                     └───────────────┘   └───────────────┘   └───────────────┘
+```mermaid
+flowchart LR
+    user(["Agency user"])
+
+    subgraph FE["Frontend · Next.js"]
+        ui["Web app"]
+        proxy["API proxy<br/>/api/proxy/*"]
+    end
+
+    subgraph BE["Backend · NestJS"]
+        guard{{"ApiKeyGuard<br/>Clerk token or x-api-key"}}
+        api["REST API<br/>leads · audit · outreach<br/>proposals · lists · billing"]
+        worker["Lead collection worker"]
+    end
+
+    subgraph DATA["Data"]
+        redis[("Redis<br/>Bull job queue")]
+        pg[("PostgreSQL<br/>via Prisma")]
+    end
+
+    subgraph EXT["External services"]
+        clerk["Clerk<br/>auth"]
+        places["Google Places API"]
+        web["Wayback Machine · PageSpeed<br/>lead websites"]
+        llm["LLM<br/>Ollama or Anthropic"]
+        rzp["Razorpay"]
+    end
+
+    user --> ui
+    ui -. "sign in" .-> clerk
+    ui --> proxy
+    proxy -- "Bearer token" --> guard
+    guard -. "verify" .-> clerk
+    guard --> api
+    api -- "enqueue search" --> redis
+    redis --> worker
+    worker -- "fetch businesses" --> places
+    worker -- "score + upsert" --> pg
+    api --> pg
+    api -- "website audit" --> web
+    api -- "outreach + proposals" --> llm
+    api -- "orders" --> rzp
+    rzp -. "payment webhook" .-> api
+
+    classDef store fill:#eef4ff,stroke:#4a6fa5,color:#1b2a41
+    classDef ext fill:#f6f6f6,stroke:#999,color:#333,stroke-dasharray:4 3
+    class redis,pg store
+    class clerk,places,web,llm,rzp ext
 ```
 
-A search enqueues a collection job; the job fetches businesses from Google Places, computes an opportunity score for each, and upserts them into Postgres. The frontend polls the job until it's done, then renders results and offers a CSV export.
+A search enqueues a collection job in Redis. The worker fetches businesses from Google Places, computes an opportunity score for each, and upserts them into Postgres. The frontend polls the job until it's done, then renders the results and offers a CSV export. Audits, AI outreach and proposals, and billing run directly through the REST API. Every request from the frontend goes through the Next.js proxy, which attaches the user's Clerk token. CI and admin scripts use `x-api-key` instead.
 
 ---
 
